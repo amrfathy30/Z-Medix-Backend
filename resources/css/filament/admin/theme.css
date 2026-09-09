@@ -1,0 +1,21 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+@source '../../../../resources/views/livewire/**/*';
+@source '../../../../app/Livewire/**/*';
+
+/* Hide the bottom per-page selector only inside the admins table; the toolbar has its own. */
+.access-management-admins-table .fi-pagination-records-per-page-select-ctn {
+    display: none;
+}
+
+/* Filled hover for admin management outlined buttons (role cards + admin table edit). */
+.fi-btn-admin-filled-hover.fi-outlined.fi-color:not(.fi-disabled):not([disabled]):hover {
+    background-color: rgb(var(--color-600));
+    color: white;
+}
+
+.fi-btn-admin-filled-hover.fi-outlined.fi-color:not(.fi-disabled):not([disabled]):hover > .fi-icon {
+    color: white;
+}

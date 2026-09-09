@@ -1,0 +1,12 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "ordered_imports": {
+            "sort_algorithm": "alpha"
+        },
+        "array_syntax": {
+            "syntax": "short"
+        },
+        "no_unused_imports": true
+    }
+}
