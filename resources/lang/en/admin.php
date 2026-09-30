@@ -243,6 +243,9 @@ return [
         'settings_keys' => [
             // General
             'site_name' => 'Site Name',
+            'site_logo' => 'Site Logo',
+            'app_store_url' => 'App Store URL',
+            'google_play_url' => 'Google Play URL',
             'site_tagline' => 'Site Tagline',
             'contact_email' => 'Contact Email',
             'support_email' => 'Support Email',
@@ -263,12 +266,15 @@ return [
             // Footer
             'footer_contact_email' => 'Footer Contact Email',
             'footer_copyright' => 'Copyright Notice',
+            'footer_description_1' => 'Footer Description 1',
+            'footer_description_2' => 'Footer Description 2',
             'footer_customer_services_title' => 'Customer Services — Column Heading',
             'footer_quick_links_title' => 'Quick Links — Column Heading',
 
             // Social
             'social_twitter' => 'Twitter / X URL',
             'social_linkedin' => 'LinkedIn URL',
+            'social_behance' => 'Behance URL',
             'social_instagram' => 'Instagram URL',
             'social_facebook' => 'Facebook URL',
             'social_youtube' => 'YouTube URL',

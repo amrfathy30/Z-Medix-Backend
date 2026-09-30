@@ -153,14 +153,14 @@ class WebsiteContentTest extends TestCase
         $page = Page::factory()->create(['key' => 'home']);
         PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'hero', 'sort_order' => 2]);
         PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'features', 'sort_order' => 1]);
-        PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'faq', 'sort_order' => 3]);
+        PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'plans', 'sort_order' => 3]);
 
         $component = Livewire::actingAs($this->superAdmin(), 'admin')
             ->test(WebsiteContentSectionsPage::class, ['pageKey' => 'home']);
 
         $keys = $component->instance()->getSections()->pluck('section_key')->all();
 
-        $this->assertSame(['features', 'hero', 'faq'], $keys);
+        $this->assertSame(['features', 'hero', 'plans'], $keys);
     }
 
     public function test_sections_page_shows_draft_sections_too(): void
@@ -168,7 +168,7 @@ class WebsiteContentTest extends TestCase
         $page = Page::factory()->create(['key' => 'home']);
         PageSection::factory()->create([
             'page_id' => $page->id,
-            'section_key' => 'how_it_works',
+            'section_key' => 'on_mobile',
             'status' => ContentStatus::Draft,
         ]);
 
@@ -177,7 +177,7 @@ class WebsiteContentTest extends TestCase
 
         $keys = $component->instance()->getSections()->pluck('section_key')->all();
 
-        $this->assertContains('how_it_works', $keys);
+        $this->assertContains('on_mobile', $keys);
     }
 
     public function test_sections_page_has_no_create_section_button(): void

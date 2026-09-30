@@ -40,9 +40,16 @@ class ContentInputFactory
     /**
      * @param  string  $basePath  State path the item's key is nested under, e.g. "data". Ignored for
      *                            media types, which bind directly to a Spatie media collection instead.
+     * @param  bool  $nested  True when the item is a field of a repeater row. A row has no media
+     *                        collection of its own, so a nested Image stores its file path in the row
+     *                        instead (see ContentMediaUrlResolver for the public URL).
      */
-    public function make(ContentItemDefinition $item, string $basePath = 'data'): Component
+    public function make(ContentItemDefinition $item, string $basePath = 'data', bool $nested = false): Component
     {
+        if ($nested && in_array($item->type, self::MEDIA_TYPES, true)) {
+            return $this->applyMeta($item, $this->makeNestedImage($item));
+        }
+
         if (in_array($item->type, self::MEDIA_TYPES, true)) {
             return $this->applyMeta($item, $this->makeMedia($item));
         }
@@ -119,12 +126,15 @@ class ContentInputFactory
                 ->acceptedFileTypes(config('media.image_mime_types', []))
                 ->maxSize(config('media.max_image_size_kb', 5 * 1024))
                 ->columnSpanFull(),
-            ContentInputType::MultiImage => $upload->image()->multiple()->reorderable()
-                ->panelLayout('grid')
-                ->acceptedFileTypes(config('media.image_mime_types', []))
-                ->maxSize(config('media.max_image_size_kb', 5 * 1024))
-                ->helperText(__('admin.cms.gallery_helper'))
-                ->columnSpanFull(),
+            ContentInputType::MultiImage => $this->limitFiles(
+                $upload->image()->multiple()->reorderable()
+                    ->panelLayout('grid')
+                    ->acceptedFileTypes(config('media.image_mime_types', []))
+                    ->maxSize(config('media.max_image_size_kb', 5 * 1024))
+                    ->helperText(__('admin.cms.gallery_helper'))
+                    ->columnSpanFull(),
+                $item,
+            ),
             ContentInputType::File => $upload
                 ->acceptedFileTypes(config('media.document_mime_types', []))
                 ->maxSize(config('media.max_document_size_kb', 10 * 1024))
@@ -139,6 +149,33 @@ class ContentInputFactory
                 ->columnSpanFull(),
             default => $upload->columnSpanFull(),
         };
+    }
+
+    /** `settings['max_files']` caps how many files a MultiImage accepts. */
+    private function limitFiles(SpatieMediaLibraryFileUpload $upload, ContentItemDefinition $item): SpatieMediaLibraryFileUpload
+    {
+        if (isset($item->settings['max_files'])) {
+            $upload->maxFiles((int) $item->settings['max_files']);
+        }
+
+        return $upload;
+    }
+
+    /**
+     * Image field of a repeater row. Unlike makeMedia() it is a plain
+     * FileUpload: the stored file path lives inside the row's JSON, so it is
+     * not bound to a media collection and skips the mapper's `image`/`max`
+     * rules (they would reject an already-stored path string on save).
+     */
+    private function makeNestedImage(ContentItemDefinition $item): Field
+    {
+        if ($item->type !== ContentInputType::Image) {
+            throw new \LogicException("Only Image items can be nested in a repeater; '{$item->key}' is {$item->type->value}.");
+        }
+
+        return AdminInputs::image($item->key)
+            ->directory($item->settings['directory'] ?? 'content')
+            ->imagePreviewHeight('80');
     }
 
     private function makeTranslatable(ContentItemDefinition $item, string $path): Component
@@ -164,11 +201,38 @@ class ContentInputFactory
     private function makeRepeater(ContentItemDefinition $item, string $path): Component
     {
         $schema = array_map(
-            fn (ContentItemDefinition $nested): Component => $this->make($nested, ''),
+            fn (ContentItemDefinition $nested): Component => $this->make($nested, '', nested: true),
             $item->schema,
         );
 
-        return AdminInputs::repeater($path, $schema)->label($item->labelEn);
+        $repeater = AdminInputs::repeater($path, $schema)->label($item->labelEn);
+
+        if (isset($item->settings['min_items'])) {
+            $repeater->minItems((int) $item->settings['min_items']);
+        }
+
+        if (isset($item->settings['max_items'])) {
+            $repeater->maxItems((int) $item->settings['max_items']);
+        }
+
+        // Collapsed rows otherwise all read "Item 1", "Item 2", ...
+        if (isset($item->settings['item_label'])) {
+            $labelKey = $item->settings['item_label'];
+
+            $repeater->itemLabel(fn (array $state): ?string => $this->rowLabel($state[$labelKey] ?? null));
+        }
+
+        return $repeater;
+    }
+
+    /** Current-locale text of a row's label field, whether it is translatable or a plain string. */
+    private function rowLabel(mixed $value): ?string
+    {
+        if (is_array($value)) {
+            $value = $value[app()->getLocale()] ?? $value['en'] ?? null;
+        }
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     private function applyMeta(ContentItemDefinition $item, Field $field, ?string $locale = null): Field

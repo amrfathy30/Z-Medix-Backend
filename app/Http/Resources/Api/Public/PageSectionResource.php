@@ -4,6 +4,7 @@ namespace App\Http\Resources\Api\Public;
 
 use App\Services\Localization\ArrayLocalizer;
 use App\Services\Media\MediaUploadService;
+use App\Support\Content\Media\ContentMediaUrlResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Arr;
@@ -16,6 +17,7 @@ class PageSectionResource extends JsonResource
         $locale = app()->getLocale();
 
         $localizedData = app(ArrayLocalizer::class)->localize($this->data ?? [], $locale);
+        $localizedData = app(ContentMediaUrlResolver::class)->resolve($localizedData, $this->page?->key, $this->section_key);
 
         $title = $localizedData['title'] ?? null;
         $subtitle = $localizedData['subtitle'] ?? null;
@@ -42,6 +44,8 @@ class PageSectionResource extends JsonResource
             'media' => [
                 'background' => $this->mediaPayload('background'),
                 'image' => $this->mediaPayload('image'),
+                'image_small' => $this->mediaPayload('image_small'),
+                'logo' => $this->mediaPayload('logo'),
                 'icon' => $this->mediaPayload('icon'),
                 'gallery' => app(MediaUploadService::class)->collectionToPayload($this->resource, 'gallery'),
                 'video' => $this->mediaPayload('video'),

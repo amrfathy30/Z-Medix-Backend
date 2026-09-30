@@ -12,25 +12,30 @@ class PageContentDefinition
 {
     /**
      * @param  array<string, ContentSectionDefinition>  $sections  Keyed by section_key.
+     * @param  array<string, array<string, string>>  $seo  Default page-level SEO, e.g. `['meta_title' => ['en' => ..., 'ar' => ...]]`.
+     *                                                     Only `meta_title` and `meta_description` are read by the seeder, and only
+     *                                                     into fields that are still empty.
      */
     public function __construct(
         public readonly string $key,
         public readonly string $labelEn,
         public readonly string $labelAr,
         public readonly array $sections = [],
+        public readonly array $seo = [],
     ) {}
 
     /**
      * @param  list<ContentSectionDefinition>  $sections
+     * @param  array<string, array<string, string>>  $seo
      */
-    public static function make(string $key, string $labelEn, string $labelAr, array $sections): self
+    public static function make(string $key, string $labelEn, string $labelAr, array $sections, array $seo = []): self
     {
         $keyed = [];
         foreach ($sections as $section) {
             $keyed[$section->sectionKey] = $section;
         }
 
-        return new self($key, $labelEn, $labelAr, $keyed);
+        return new self($key, $labelEn, $labelAr, $keyed, $seo);
     }
 
     public function hasSection(string $sectionKey): bool

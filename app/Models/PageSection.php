@@ -40,6 +40,8 @@ class PageSection extends Model implements HasMedia
     {
         $this->addMediaCollection('background')->useDisk('filament_public')->singleFile();
         $this->addMediaCollection('image')->useDisk('filament_public')->singleFile();
+        $this->addMediaCollection('image_small')->useDisk('filament_public')->singleFile();
+        $this->addMediaCollection('logo')->useDisk('filament_public')->singleFile();
         $this->addMediaCollection('icon')->useDisk('filament_public')->singleFile();
         $this->addMediaCollection('gallery')->useDisk('filament_public');
         $this->addMediaCollection('video')->useDisk('filament_public')->singleFile();

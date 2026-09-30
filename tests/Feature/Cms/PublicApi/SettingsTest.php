@@ -4,7 +4,9 @@ namespace Tests\Feature\Cms\PublicApi;
 
 use App\Enums\SettingValueType;
 use App\Models\Setting;
+use Database\Seeders\CmsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class SettingsTest extends TestCase
@@ -83,5 +85,51 @@ class SettingsTest extends TestCase
 
         $this->getJson($this->url)->assertOk()
             ->assertJsonPath('data.general.0.value', 'https://api.example.test/storage/settings/logo.webp');
+    }
+
+    /** @return mixed The resolved value of one setting from a settings response. */
+    private function settingValue(TestResponse $response, string $group, string $key): mixed
+    {
+        $setting = collect($response->json("data.{$group}"))->firstWhere('key', $key);
+
+        $this->assertNotNull($setting, "Setting '{$key}' is missing from group '{$group}'.");
+
+        return $setting['value'];
+    }
+
+    public function test_website_information_settings_are_seeded_in_their_groups(): void
+    {
+        $this->seed(CmsSeeder::class);
+
+        $response = $this->getJson($this->url)->assertOk();
+
+        foreach (['site_name', 'site_logo', 'app_store_url', 'google_play_url'] as $key) {
+            $this->assertContains($key, collect($response->json('data.general'))->pluck('key')->all());
+        }
+
+        foreach (['footer_description_1', 'footer_description_2', 'footer_copyright'] as $key) {
+            $this->assertContains($key, collect($response->json('data.footer'))->pluck('key')->all());
+        }
+
+        foreach (['social_behance', 'social_instagram', 'social_linkedin'] as $key) {
+            $this->assertContains($key, collect($response->json('data.social'))->pluck('key')->all());
+        }
+
+        $this->assertSame('Z-MEDIX', $this->settingValue($response, 'general', 'site_name'));
+        $this->assertNull($this->settingValue($response, 'general', 'site_logo'));
+    }
+
+    public function test_translatable_footer_settings_resolve_to_the_request_locale(): void
+    {
+        $this->seed(CmsSeeder::class);
+
+        $en = $this->getJson($this->url.'?lang=en')->assertOk();
+        $ar = $this->getJson($this->url.'?lang=ar')->assertOk();
+
+        $this->assertSame('© 2026 Z-MEDIX. All rights reserved.', $this->settingValue($en, 'footer', 'footer_copyright'));
+        $this->assertSame('© 2026 Z-MEDIX. جميع الحقوق محفوظة.', $this->settingValue($ar, 'footer', 'footer_copyright'));
+        $this->assertSame('Your smarter way to learn medicine.', $this->settingValue($en, 'footer', 'footer_description_1'));
+        $this->assertSame('طريقتك الأذكى لتعلّم الطب.', $this->settingValue($ar, 'footer', 'footer_description_1'));
+        $this->assertIsString($this->settingValue($en, 'footer', 'footer_description_2'));
     }
 }

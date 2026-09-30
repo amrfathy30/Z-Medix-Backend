@@ -132,11 +132,20 @@ class CmsSeeder extends Seeder
         }
     }
 
+    /** JSON `{en, ar}` value for a translatable setting — see SettingsPage::isTranslatable(). */
+    private static function translated(string $en, string $ar): string
+    {
+        return json_encode(['en' => $en, 'ar' => $ar], JSON_UNESCAPED_UNICODE);
+    }
+
     private function seedSettings(): void
     {
         $settings = [
             // ── General ──────────────────────────────────────────────────────
-            ['key' => 'site_name', 'value' => 'Starter Platform', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Platform display name'],
+            ['key' => 'site_name', 'value' => 'Z-MEDIX', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Platform display name'],
+            ['key' => 'site_logo', 'value' => null, 'value_type' => SettingValueType::Image, 'group' => 'general', 'is_public' => true, 'description' => 'Website logo'],
+            ['key' => 'app_store_url', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Apple App Store link for the mobile app'],
+            ['key' => 'google_play_url', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Google Play Store link for the mobile app'],
             ['key' => 'site_tagline', 'value' => 'Your Starter Platform Tagline', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Short tagline shown in browser tabs and metadata'],
             ['key' => 'contact_email', 'value' => 'info@example.test', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Primary contact email'],
             ['key' => 'support_email', 'value' => 'support@example.test', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Customer support email'],
@@ -155,7 +164,9 @@ class CmsSeeder extends Seeder
             ['key' => 'faq_title', 'value' => 'Frequently Asked Questions', 'value_type' => SettingValueType::String, 'group' => 'home', 'is_public' => true, 'description' => 'Heading for the FAQ section on the home page'],
 
             // ── Footer ───────────────────────────────────────────────────────
-            ['key' => 'footer_copyright', 'value' => '© 2026 Starter Platform. All rights reserved.', 'value_type' => SettingValueType::String, 'group' => 'footer', 'is_public' => true, 'description' => 'Copyright notice displayed in the footer'],
+            ['key' => 'footer_description_1', 'value' => self::translated('Your smarter way to learn medicine.', 'طريقتك الأذكى لتعلّم الطب.'), 'value_type' => SettingValueType::Json, 'group' => 'footer', 'is_public' => true, 'description' => 'First description shown in the footer'],
+            ['key' => 'footer_description_2', 'value' => self::translated('AI-powered learning, medical resources, practice, and progress — all in one place.', 'تعلّم مدعوم بالذكاء الاصطناعي ومصادر طبية وتدريب وتتبّع للتقدم — كل ذلك في مكان واحد.'), 'value_type' => SettingValueType::Json, 'group' => 'footer', 'is_public' => true, 'description' => 'Second description shown in the footer'],
+            ['key' => 'footer_copyright', 'value' => self::translated('© 2026 Z-MEDIX. All rights reserved.', '© 2026 Z-MEDIX. جميع الحقوق محفوظة.'), 'value_type' => SettingValueType::Json, 'group' => 'footer', 'is_public' => true, 'description' => 'Copyright notice displayed in the footer'],
             ['key' => 'footer_contact_email', 'value' => 'info@example.test', 'value_type' => SettingValueType::String, 'group' => 'footer', 'is_public' => true, 'description' => 'Contact email shown in the footer'],
             ['key' => 'footer_quick_links_title', 'value' => 'Quick Links', 'value_type' => SettingValueType::String, 'group' => 'footer', 'is_public' => true, 'description' => 'Heading for the quick links column in the footer'],
             ['key' => 'footer_customer_services_title', 'value' => 'Customer Services', 'value_type' => SettingValueType::String, 'group' => 'footer', 'is_public' => true, 'description' => 'Heading for the customer services column in the footer'],
@@ -163,6 +174,7 @@ class CmsSeeder extends Seeder
             // ── Social ───────────────────────────────────────────────────────
             ['key' => 'social_twitter', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'social', 'is_public' => true, 'description' => 'Twitter/X profile URL'],
             ['key' => 'social_linkedin', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'social', 'is_public' => true, 'description' => 'LinkedIn profile URL'],
+            ['key' => 'social_behance', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'social', 'is_public' => true, 'description' => 'Behance profile URL'],
             ['key' => 'social_instagram', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'social', 'is_public' => true, 'description' => 'Instagram profile URL'],
             ['key' => 'social_facebook', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'social', 'is_public' => true, 'description' => 'Facebook page URL'],
             ['key' => 'social_youtube', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'social', 'is_public' => true, 'description' => 'YouTube channel URL'],
