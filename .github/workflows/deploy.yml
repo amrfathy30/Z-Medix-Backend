@@ -48,6 +48,10 @@ jobs:
             php artisan migrate --force
             php artisan db:seed --force
 
+            # artisan runs as the SSH user, so the cache/log files it creates must be made writable
+            # for the web server user. Files owned by the web user are skipped (errors ignored).
+            chmod -R a+rwX storage bootstrap/cache 2>/dev/null || true
+
       - name: Upload built assets
         uses: appleboy/scp-action@v0.1.7
         with:
