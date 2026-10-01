@@ -21,6 +21,10 @@ jobs:
           node-version: 22
           cache: npm
 
+      # The Filament theme imports CSS from vendor/, so Composer packages must exist before the Vite build.
+      - name: Install Composer dependencies
+        run: composer install --no-dev --no-scripts --no-interaction --prefer-dist --ignore-platform-reqs
+
       - name: Build frontend assets
         run: |
           npm ci
