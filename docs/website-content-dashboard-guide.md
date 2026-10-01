@@ -373,13 +373,14 @@ The `home` page is the Z-MEDIX landing page (`design/Landing Page.png`). Fetch i
 | `features` | `title`, `data.description`, `data.features[]` = `{title, description, icon}` (max 6) | — |
 | `plans` | `title`, `data.description`, `data.plans[]` = `{title, price, discount, billing_type, features[{label}], background_color, icon, icon_color}` (max 6) | — |
 | `ai_assistant` | `subtitle`, `title`, `data.description`, `data.highlights[]` = `{title, icon}` (max 3) | `image`, `logo`, `gallery` (max 4) |
-| `on_mobile` | `subtitle`, `title`, `data.description`, `data.app_store_url`, `data.google_play_url` | `image` |
+| `on_mobile` | `subtitle`, `title`, `data.description`, `data.app_store_url`, `data.google_play_url` (both from Site Settings) | `image` |
 
 Notes for the frontend:
 
 - `plans` holds every billing cycle: three rows with `billing_type: "monthly"` and three with `"yearly"`. Filter by `billing_type` when the Monthly/Yearly toggle changes.
-- `price` is a number without a currency symbol. `discount` is a percentage (0–100) or `null`. `icon` is an icon key (e.g. `crown`) that the frontend maps to an icon; `background_color` / `icon_color` are hex colours.
-- Feature and highlight `icon` values are image URLs (uploaded from the dashboard) or `null` until uploaded.
+- `price` is a number without a currency symbol. `discount` is a percentage (0–100) or `null`. `icon` is an image URL (uploaded from the dashboard) or `null` until uploaded; `background_color` / `icon_color` are hex colours.
+- Feature, plan and highlight `icon` values are image URLs (uploaded from the dashboard) or `null` until uploaded.
+- `on_mobile` has no store-link fields in the dashboard. `data.app_store_url` and `data.google_play_url` are filled by the API from the `app_store_url` / `google_play_url` Site Settings (`general` group) — edit them under Site Settings. They are `null` while the setting is empty or not public.
 - Sections that are not defined for the page (the old `how_it_works`, `testimonials`, `cta_banner`, `faq` placeholders) are not returned, even if rows for them still exist in the database.
 
 ### Website information (Settings)

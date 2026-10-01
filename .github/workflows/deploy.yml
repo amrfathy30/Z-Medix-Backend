@@ -46,7 +46,9 @@ jobs:
             ./deploy.sh
 
             php artisan migrate --force
-            php artisan db:seed --force
+
+            # public/storage is git-ignored, so it must be (re)created on the server or uploaded files 403.
+            php artisan storage:link --force
 
             # artisan runs as the SSH user, so the cache/log files it creates must be made writable
             # for the web server user. Files owned by the web user are skipped (errors ignored).

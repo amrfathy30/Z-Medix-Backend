@@ -57,7 +57,7 @@ class LandingPageDefinitionsTest extends TestCase
             $this->itemKeys('ai_assistant'),
         );
         $this->assertSame(
-            ['subtitle', 'title', 'description', 'app_store_url', 'google_play_url', 'image'],
+            ['subtitle', 'title', 'description', 'image'],
             $this->itemKeys('on_mobile'),
         );
     }

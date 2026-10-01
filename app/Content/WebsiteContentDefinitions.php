@@ -201,15 +201,7 @@ class WebsiteContentDefinitions
                         'label_ar' => 'لون الخلفية',
                         'sort_order' => 6,
                     ]),
-                    ContentItemDefinition::make([
-                        'key' => 'icon',
-                        'type' => ContentInputType::Icon,
-                        'label_en' => 'Icon',
-                        'label_ar' => 'الأيقونة',
-                        'help_en' => 'Icon key the frontend maps to an icon, e.g. "crown".',
-                        'help_ar' => 'مفتاح الأيقونة الذي يربطه الفرونت إند بأيقونة، مثل "crown".',
-                        'sort_order' => 7,
-                    ]),
+                    self::image('icon', 'Icon', 'الأيقونة', 7),
                     ContentItemDefinition::make([
                         'key' => 'icon_color',
                         'type' => ContentInputType::Color,
@@ -280,6 +272,11 @@ class WebsiteContentDefinitions
         ]);
     }
 
+    /**
+     * The App Store / Google Play links are not edited here: the public API fills
+     * `data.app_store_url` and `data.google_play_url` from the `app_store_url` and
+     * `google_play_url` Site Settings (see Api\Public\PageSectionResource).
+     */
     private static function homeOnMobile(): ContentSectionDefinition
     {
         return ContentSectionDefinition::make([
@@ -291,21 +288,7 @@ class WebsiteContentDefinitions
                 self::subtitle(1),
                 self::title(2),
                 self::description(3),
-                ContentItemDefinition::make([
-                    'key' => 'app_store_url',
-                    'type' => ContentInputType::Url,
-                    'label_en' => 'App Store Link',
-                    'label_ar' => 'رابط App Store',
-                    'sort_order' => 4,
-                ]),
-                ContentItemDefinition::make([
-                    'key' => 'google_play_url',
-                    'type' => ContentInputType::Url,
-                    'label_en' => 'Google Play Store Link',
-                    'label_ar' => 'رابط Google Play',
-                    'sort_order' => 5,
-                ]),
-                self::image('image', 'Image', 'الصورة', 6),
+                self::image('image', 'Image', 'الصورة', 4),
             ],
             'default_data' => [
                 'subtitle' => ['en' => 'On Mobile', 'ar' => 'على الجوال'],
@@ -314,8 +297,6 @@ class WebsiteContentDefinitions
                     'en' => 'Take your learning with you wherever you go. Study, practice, and learn on the move.',
                     'ar' => 'خذ تعلّمك معك أينما ذهبت. ادرس وتدرّب وتعلّم أثناء التنقل.',
                 ],
-                'app_store_url' => null,
-                'google_play_url' => null,
             ],
         ]);
     }
@@ -345,7 +326,7 @@ class WebsiteContentDefinitions
                 ['label' => ['en' => 'Premium audio quality', 'ar' => 'جودة صوت متميزة']],
             ],
             'background_color' => $backgroundColor,
-            'icon' => 'crown',
+            'icon' => null,
             'icon_color' => $iconColor,
         ];
     }

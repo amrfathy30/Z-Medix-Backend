@@ -486,7 +486,7 @@ class PageSectionResourceTest extends TestCase
             'features' => ['data.title.en', 'data.description.ar', 'data.features'],
             'plans' => ['data.title.en', 'data.description.en', 'data.plans'],
             'ai_assistant' => ['data.subtitle.en', 'data.title.ar', 'data.description.en', 'image', 'supporting_images', 'logo', 'data.highlights'],
-            'on_mobile' => ['data.subtitle.en', 'data.title.en', 'data.description.en', 'data.app_store_url', 'data.google_play_url', 'image'],
+            'on_mobile' => ['data.subtitle.en', 'data.title.en', 'data.description.en', 'image'],
         ];
 
         foreach ($expected as $sectionKey => $fields) {
@@ -513,7 +513,6 @@ class PageSectionResourceTest extends TestCase
                 'billing_type' => 'yearly',
                 'features' => [['label' => ['en' => 'Offline mode', 'ar' => 'وضع عدم الاتصال']]],
                 'background_color' => '#112233',
-                'icon' => 'crown',
                 'icon_color' => '#FFFFFF',
             ]]])
             ->call('save')
@@ -552,28 +551,12 @@ class PageSectionResourceTest extends TestCase
             ->assertHasFormErrors();
     }
 
-    public function test_on_mobile_store_links_must_be_urls_and_persist(): void
+    public function test_on_mobile_store_links_are_not_section_fields_because_they_come_from_settings(): void
     {
-        $section = $this->section('home', 'on_mobile');
-
         Livewire::actingAs($this->superAdmin(), 'admin')
-            ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
-            ->fillForm(['data.app_store_url' => 'not a url'])
-            ->call('save')
-            ->assertHasFormErrors(['data.app_store_url']);
-
-        Livewire::actingAs($this->superAdmin(), 'admin')
-            ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
-            ->fillForm([
-                'data.app_store_url' => 'https://apps.apple.com/app/z-medix',
-                'data.google_play_url' => 'https://play.google.com/store/apps/details?id=z.medix',
-            ])
-            ->call('save')
-            ->assertHasNoFormErrors();
-
-        $data = $section->refresh()->data;
-        $this->assertSame('https://apps.apple.com/app/z-medix', $data['app_store_url']);
-        $this->assertSame('https://play.google.com/store/apps/details?id=z.medix', $data['google_play_url']);
+            ->test(EditPageSection::class, ['record' => $this->section('home', 'on_mobile')->getRouteKey()])
+            ->assertFormFieldDoesNotExist('data.app_store_url')
+            ->assertFormFieldDoesNotExist('data.google_play_url');
     }
 
     public function test_hero_image_uploads_persist_to_their_own_media_collections(): void

@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Cms\PublicApi;
 
+use App\Enums\SettingValueType;
 use App\Models\Page;
 use App\Models\PageSection;
+use App\Models\Setting;
 use App\Services\Media\MediaUploadService;
 use Database\Seeders\PageSectionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,6 +40,16 @@ class LandingPageTest extends TestCase
         $page = Page::query()->where('key', 'home')->firstOrFail();
 
         return PageSection::query()->where('page_id', $page->id)->where('section_key', $sectionKey)->firstOrFail();
+    }
+
+    private function storeLinkSetting(string $key, string $value, bool $isPublic = true): void
+    {
+        Setting::query()->updateOrCreate(['key' => $key], [
+            'value' => $value,
+            'value_type' => SettingValueType::String,
+            'group' => 'general',
+            'is_public' => $isPublic,
+        ]);
     }
 
     public function test_home_returns_the_five_landing_sections_in_design_order(): void
@@ -87,7 +99,7 @@ class LandingPageTest extends TestCase
         );
         $this->assertSame('الباقة الأساسية', $plan['title']);
         $this->assertSame('حظر الموسيقى الصريحة', $plan['features'][0]['label']);
-        $this->assertSame('crown', $plan['icon']);
+        $this->assertNull($plan['icon']);
         $this->assertEquals(5.99, $plan['price']);
     }
 
@@ -105,6 +117,22 @@ class LandingPageTest extends TestCase
             $features[0]['icon'],
         );
         $this->assertNull($features[1]['icon']);
+    }
+
+    public function test_plan_icons_are_public_urls_once_uploaded(): void
+    {
+        $section = $this->section('plans');
+        $data = $section->data;
+        $data['plans'][0]['icon'] = 'content/crown.svg';
+        $section->update(['data' => $data]);
+
+        $plans = $this->sections()['plans']['data']['plans'];
+
+        $this->assertSame(
+            rtrim((string) config('app.url'), '/').'/storage/content/crown.svg',
+            $plans[0]['icon'],
+        );
+        $this->assertNull($plans[1]['icon']);
     }
 
     public function test_highlight_icons_are_resolved_the_same_way(): void
@@ -148,18 +176,35 @@ class LandingPageTest extends TestCase
         $this->assertNull($sections['on_mobile']['media']['image']);
     }
 
-    public function test_on_mobile_exposes_store_links_under_data(): void
+    public function test_on_mobile_store_links_come_from_settings(): void
     {
-        $section = $this->section('on_mobile');
-        $section->update(['data' => array_merge($section->data, [
-            'app_store_url' => 'https://apps.apple.com/app/z-medix',
-            'google_play_url' => 'https://play.google.com/store/apps/details?id=z.medix',
-        ])]);
+        $onMobile = $this->sections()['on_mobile'];
+
+        // The seeded settings are empty strings, which the API reports as null.
+        $this->assertArrayHasKey('app_store_url', $onMobile['data']);
+        $this->assertNull($onMobile['data']['app_store_url']);
+        $this->assertNull($onMobile['data']['google_play_url']);
+
+        $this->storeLinkSetting('app_store_url', 'https://apps.apple.com/app/z-medix');
+        $this->storeLinkSetting('google_play_url', 'https://play.google.com/store/apps/details?id=z.medix');
 
         $onMobile = $this->sections()['on_mobile'];
 
         $this->assertSame('https://apps.apple.com/app/z-medix', $onMobile['data']['app_store_url']);
         $this->assertSame('https://play.google.com/store/apps/details?id=z.medix', $onMobile['data']['google_play_url']);
+    }
+
+    public function test_on_mobile_settings_override_links_left_in_the_section_data_and_private_settings_are_not_exposed(): void
+    {
+        $section = $this->section('on_mobile');
+        $section->update(['data' => array_merge($section->data, ['app_store_url' => 'https://stale.example.test'])]);
+
+        $this->storeLinkSetting('google_play_url', 'https://play.google.com/store/apps/details?id=z.medix', isPublic: false);
+
+        $onMobile = $this->sections()['on_mobile'];
+
+        $this->assertNull($onMobile['data']['app_store_url']);
+        $this->assertNull($onMobile['data']['google_play_url']);
     }
 
     public function test_placeholder_sections_removed_from_the_definition_are_no_longer_served(): void
