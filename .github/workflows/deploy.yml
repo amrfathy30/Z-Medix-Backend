@@ -45,6 +45,9 @@ jobs:
             cd /var/www/zmedix-backend
             ./deploy.sh
 
+            php artisan migrate --force
+            php artisan db:seed --force
+
       - name: Upload built assets
         uses: appleboy/scp-action@v0.1.7
         with:
