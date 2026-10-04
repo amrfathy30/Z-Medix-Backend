@@ -28,12 +28,16 @@ class PhoneNumberService
      * Add a new phone number for any Eloquent model owner.
      *
      * @param  array{phone: string, country?: string}  $data
+     * @param  list<string>|null  $allowedCountries  Overrides config('phone.allowed_countries')
+     *                                               for this call. An empty array accepts every
+     *                                               parseable country; null uses the config value.
      */
-    public function addPhone(Model $owner, array $data): PhoneNumber
+    public function addPhone(Model $owner, array $data, ?array $allowedCountries = null): PhoneNumber
     {
         [$e164, $countryIso2, $countryCode, $nationalNumber] = $this->parseAndValidate(
             $data['phone'],
-            $data['country'] ?? config('phone.default_country')
+            $data['country'] ?? config('phone.default_country'),
+            $allowedCountries
         );
 
         $this->enforceUniquenessForOwner($owner, $e164);
@@ -64,12 +68,16 @@ class PhoneNumberService
      * Update the phone number. Resets verification if the E.164 number changes.
      *
      * @param  array{phone: string, country?: string}  $data
+     * @param  list<string>|null  $allowedCountries  Overrides config('phone.allowed_countries')
+     *                                               for this call. An empty array accepts every
+     *                                               parseable country; null uses the config value.
      */
-    public function updatePhone(PhoneNumber $phoneNumber, array $data): PhoneNumber
+    public function updatePhone(PhoneNumber $phoneNumber, array $data, ?array $allowedCountries = null): PhoneNumber
     {
         [$e164, $countryIso2, $countryCode, $nationalNumber] = $this->parseAndValidate(
             $data['phone'],
-            $data['country'] ?? $phoneNumber->country_iso2 ?? config('phone.default_country')
+            $data['country'] ?? $phoneNumber->country_iso2 ?? config('phone.default_country'),
+            $allowedCountries
         );
 
         $numberChanged = $e164 !== $phoneNumber->e164_number;
@@ -264,11 +272,12 @@ class PhoneNumberService
     /**
      * Parse and validate a phone number. Returns [e164, countryIso2, countryCode, nationalNumber].
      *
+     * @param  list<string>|null  $allowedCountries
      * @return array{string, string, string, string}
      */
-    private function parseAndValidate(string $phone, string $defaultCountry): array
+    private function parseAndValidate(string $phone, string $defaultCountry, ?array $allowedCountries = null): array
     {
-        $allowedCountries = config('phone.allowed_countries', []);
+        $allowedCountries ??= config('phone.allowed_countries', []);
 
         try {
             $parsed = new PhoneParser($phone, $defaultCountry);

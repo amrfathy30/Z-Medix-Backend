@@ -9,6 +9,7 @@ use App\Http\Resources\Api\UserProfileResource;
 use App\Models\User;
 use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
 
 class LoginController extends Controller
@@ -20,15 +21,46 @@ class LoginController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
-            return $this->errorResponse('The provided credentials are incorrect.', [], 401);
+            return $this->errorResponse(
+                'The provided credentials are incorrect.',
+                [],
+                Response::HTTP_UNAUTHORIZED,
+                'INVALID_CREDENTIALS',
+            );
         }
 
         if ($user->status === AccountStatus::Suspended || $user->status === AccountStatus::Blocked || $user->status === AccountStatus::Inactive) {
-            return $this->errorResponse('Your account has been suspended. Please contact support.', [], 403);
+            return $this->errorResponse(
+                'Your account has been suspended. Please contact support.',
+                [],
+                Response::HTTP_FORBIDDEN,
+                'ACCOUNT_SUSPENDED',
+            );
         }
 
-        if ($user->status === AccountStatus::Pending && ! config('auth_features.login.allow_pending_users')) {
-            return $this->errorResponse('Your account is pending approval. Please check back later.', [], 403);
+        // Email verification is the only verification that gates platform access.
+        // Phone verification deliberately does not block login. Checked before the
+        // status gate so an unverified account always receives the code the client
+        // can act on.
+        if (! $user->hasVerifiedEmail()) {
+            return $this->errorResponse(
+                'Your email address is not verified. Please verify your email address to continue.',
+                [],
+                Response::HTTP_FORBIDDEN,
+                'EMAIL_NOT_VERIFIED',
+            );
+        }
+
+        // Login requires an active account. Pending accounts are rejected even once
+        // the email is verified: only the OTP activation flow promotes an account to
+        // active, and any status other than active is not eligible.
+        if ($user->status !== AccountStatus::Active) {
+            return $this->errorResponse(
+                'Your account is not active. Please contact support.',
+                [],
+                Response::HTTP_FORBIDDEN,
+                'ACCOUNT_NOT_ACTIVE',
+            );
         }
 
         $user->update(['last_login_at' => now()]);

@@ -189,9 +189,9 @@ class EmailVerificationTest extends TestCase
         $this->getJson($url)->assertStatus(422)->assertJsonPath('success', false);
     }
 
-    // ─── Login still works ───────────────────────────────────────────────────
+    // ─── Login gating ────────────────────────────────────────────────────────
 
-    public function test_login_still_works_for_unverified_user(): void
+    public function test_login_is_rejected_for_an_unverified_user(): void
     {
         $user = $this->unverifiedUser();
         $user->update(['password' => 'password']);
@@ -199,15 +199,33 @@ class EmailVerificationTest extends TestCase
         $this->postJson('/api/public/auth/login', [
             'email' => $user->email,
             'password' => 'password',
+        ])->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('code', 'EMAIL_NOT_VERIFIED');
+    }
+
+    public function test_login_succeeds_once_the_signed_link_has_verified_the_email(): void
+    {
+        $user = $this->unverifiedUser();
+        $user->update(['password' => 'password']);
+
+        $this->getJson($this->verifyUrl($user))->assertOk();
+
+        $this->postJson('/api/public/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
         ])->assertOk()
-            ->assertJsonPath('data.user.is_email_verified', false);
+            ->assertJsonPath('data.user.is_email_verified', true);
     }
 
     // ─── Guard rails ─────────────────────────────────────────────────────────
 
-    public function test_no_registration_routes_exist(): void
+    public function test_registration_is_only_exposed_on_the_public_auth_prefix(): void
     {
-        $this->postJson('/api/public/auth/register', [])->assertStatus(404);
+        // Student registration now exists; 422 proves the route is reachable and
+        // validated. It must not be mirrored on the admin prefix.
+        $this->postJson('/api/public/auth/register', [])->assertStatus(422);
+        $this->postJson('/api/admin/auth/register', [])->assertStatus(404);
     }
 
     public function test_no_phone_verification_routes_exist(): void

@@ -4,22 +4,22 @@ namespace App\Http\Controllers\Api\Public\Auth;
 
 use App\Exceptions\Auth\EmailOtpException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\Public\Auth\ForgotPasswordRequest;
+use App\Http\Requests\Api\Public\Auth\ResendEmailOtpRequest;
 use App\Services\Auth\EmailOtpService;
 use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Starts the student password reset flow by emailing a one-time passcode.
+ * Re-issues an email verification code, invalidating any previous pending code.
  */
-class ForgotPasswordController extends Controller
+class ResendEmailOtpController extends Controller
 {
     use ApiResponse;
 
-    public function __invoke(ForgotPasswordRequest $request, EmailOtpService $emailOtp): JsonResponse
+    public function __invoke(ResendEmailOtpRequest $request, EmailOtpService $emailOtp): JsonResponse
     {
         try {
-            $emailOtp->sendForPasswordReset($request->string('email')->value(), [
+            $emailOtp->resend($request->string('email')->value(), metadata: [
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
@@ -27,11 +27,11 @@ class ForgotPasswordController extends Controller
             return $this->errorResponse($e->getMessage(), [], $e->status, $e->errorCode);
         }
 
-        // Always generic: the same response is returned whether or not the address
-        // belongs to an account eligible for a password reset.
+        // Deliberately generic: the same response is returned whether or not the
+        // address belongs to an account awaiting verification.
         return $this->successResponse(
             null,
-            'If that email address is in our system, we have sent a password reset code.',
+            'If that email address is awaiting verification, we have sent a new verification code.',
         );
     }
 }

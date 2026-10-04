@@ -19,9 +19,12 @@ class ScopeTest extends TestCase
         $this->getJson('/api/public/lecturers')->assertNotFound();
     }
 
-    public function test_no_registration_routes_exist(): void
+    public function test_registration_is_only_exposed_on_the_public_auth_prefix(): void
     {
-        $this->postJson('/api/public/auth/register', [])->assertNotFound();
+        // Student registration now exists; 422 proves the route is reachable and
+        // validated. It must not be mirrored on the admin prefix.
+        $this->postJson('/api/public/auth/register', [])->assertStatus(422);
+        $this->postJson('/api/admin/auth/register', [])->assertNotFound();
     }
 
     public function test_no_testimonials_table_endpoint_exists(): void

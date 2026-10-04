@@ -5,7 +5,7 @@ namespace App\Http\Requests\Api\Public\Auth;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
-class ResetPasswordRequest extends FormRequest
+class ResendEmailOtpRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,16 +16,14 @@ class ResetPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'reset_token' => ['required', 'string'],
-            'password' => ['required', 'string', 'confirmed', 'min:8'],
+            'email' => ['required', 'string', 'email'],
         ];
     }
 
-    /** @return array<string, string> */
-    public function attributes(): array
+    protected function prepareForValidation(): void
     {
-        return [
-            'reset_token' => 'reset token',
-        ];
+        if (is_string($this->email)) {
+            $this->merge(['email' => trim($this->email)]);
+        }
     }
 }

@@ -12,6 +12,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            // Country reference data is required before students can register.
+            WorldSeeder::class,
             RolesPermissionsSeeder::class,
             SuperAdminSeeder::class,
             CmsSeeder::class,
