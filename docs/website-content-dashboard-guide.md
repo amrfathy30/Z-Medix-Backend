@@ -193,6 +193,8 @@ After the seeder runs:
 - the dashboard form is generated from the input definitions (`PageSectionResource::buildComponents()` via `ContentInputFactory`),
 - admins can edit the seeded/default content.
 
+A page definition can also carry default page-level SEO: `PageContentDefinition::make($key, $labelEn, $labelAr, $sections, seo: ['meta_title' => ['en' => ..., 'ar' => ...], 'meta_description' => [...]])`. The seeder writes `meta_title` / `meta_description` (and `published_at` for published pages) **only into fields that are still empty**, so it also fills an already-seeded page without touching values edited under "SEO settings". `public_path` and `canonical_url` are never seeded, because they feed the sitemap and hreflang and must match the real frontend URLs.
+
 If admin content already exists, the seeder does not overwrite it — `PageSectionSeeder::seedSection()` only writes `data` when the `PageSection` row is first created (`firstOrCreate`), and subsequent runs only refresh `label`/`sort_order`. Developers should not expect changing `default_data` in code to overwrite production/admin-edited content automatically.
 
 ## 8. Field/input types
@@ -281,6 +283,16 @@ Expected JSON shape (stored under the repeater's key in `data`):
 
 Repeater item keys (the `key` of each nested `ContentItemDefinition`) must remain stable once the frontend integrates with them, because the frontend reads each item by that key from the JSON array.
 
+Optional `settings` on a repeater item (see `ContentInputFactory::makeRepeater()`):
+
+| Setting | Effect |
+| --- | --- |
+| `max_items` | Refuses to save more rows than this (e.g. `6` feature cards). |
+| `min_items` | Requires at least this many rows. |
+| `item_label` | Key of a nested field whose current-locale value titles each collapsed row. |
+
+Repeaters can nest (a `plans` row contains a `features` repeater), and nested fields may be translatable, colours, selects, money and so on.
+
 ## 10. Media inputs
 
 - Media input keys map to Spatie Media Library collection names. `ContentInputFactory::makeMedia()` binds `SpatieMediaLibraryFileUpload::make($item->key)->collection($item->settings['collection'] ?? $item->key)`.
@@ -288,6 +300,19 @@ Repeater item keys (the `key` of each nested `ContentItemDefinition`) must remai
 - Example: an `icon`-keyed image item maps to the `icon` media collection.
 - Do not rename media item keys casually, because previously uploaded files remain attached to the collection name that was in use at upload time.
 - The public API resource layer (`PageSectionResource` under `App\Http\Resources\Api\Public`) is responsible for including media URLs in the response if the section's media is exposed there.
+- `PageSection` registers these collections: `background`, `image`, `image_small`, `logo`, `icon`, `gallery`, `video`. The API returns each under `media.<collection>` (a single-file collection is an object or `null`, `gallery` is an array). Register a new collection in `PageSection::registerMediaCollections()` *and* add it to the `media` block of the API `PageSectionResource` before pointing an item at it via `settings['collection']`.
+- Media is stored per section row, so `image` on `hero` and `image` on `on_mobile` are separate uploads even though they share a collection name.
+- `MultiImage` accepts `settings['max_files']` to cap the number of uploads, e.g. `['collection' => 'gallery', 'max_files' => 4]`.
+
+### Images inside repeater rows
+
+A repeater row has no media collection of its own, so an `Image` item in a repeater's `schema` is a plain upload (disk `filament_public`, folder `content/`) whose **file path is stored in the row's JSON**. Only `Image` can be nested; any other media type throws a `LogicException` when the form is built.
+
+The public API converts those paths to absolute URLs (`Api\Public\PageSectionResource` → `App\Support\Content\Media\ContentMediaUrlResolver`, driven by the section definition), so the frontend always receives a URL or `null`:
+
+```json
+{ "features": [ { "title": "AI Study Assistant", "icon": "https://example.test/storage/content/robot.png" } ] }
+```
 
 ## 11. Seeder behavior
 
@@ -337,6 +362,42 @@ GET /api/public/pages/{page_key}/sections
 7. Admin edits content.
 8. Admin saves.
 9. The public API returns the updated content.
+
+## 13a. Landing page contract (`home`)
+
+The `home` page is the Z-MEDIX landing page (`design/Landing Page.png`). Fetch it with `GET /api/public/pages/home/sections?lang=en|ar`. `title` and `subtitle` come back at the top level of each section; everything else is under `data` (`description` included) and `media`.
+
+| `section_key` | `data` / top level | `media` |
+| --- | --- | --- |
+| `hero` | `title`, `data.description` | `image`, `image_small` |
+| `features` | `title`, `data.description`, `data.features[]` = `{title, description, icon}` (max 6) | — |
+| `plans` | `title`, `data.description`, `data.plans[]` = `{title, price, discount, billing_type, features[{label}], background_color, icon, icon_color}` (max 6) | — |
+| `ai_assistant` | `subtitle`, `title`, `data.description`, `data.highlights[]` = `{title, icon}` (max 3) | `image`, `logo`, `gallery` (max 4) |
+| `on_mobile` | `subtitle`, `title`, `data.description`, `data.app_store_url`, `data.google_play_url` (both from Site Settings) | `image` |
+
+Notes for the frontend:
+
+- `plans` holds every billing cycle: three rows with `billing_type: "monthly"` and three with `"yearly"`. Filter by `billing_type` when the Monthly/Yearly toggle changes.
+- `price` is a number without a currency symbol. `discount` is a percentage (0–100) or `null`. `icon` is an image URL (uploaded from the dashboard) or `null` until uploaded; `background_color` / `icon_color` are hex colours.
+- Feature, plan and highlight `icon` values are image URLs (uploaded from the dashboard) or `null` until uploaded.
+- `on_mobile` has no store-link fields in the dashboard. `data.app_store_url` and `data.google_play_url` are filled by the API from the `app_store_url` / `google_play_url` Site Settings (`general` group) — edit them under Site Settings. They are `null` while the setting is empty or not public.
+- Sections that are not defined for the page (the old `how_it_works`, `testimonials`, `cta_banner`, `faq` placeholders) are not returned, even if rows for them still exist in the database.
+
+### Website information (Settings)
+
+Site-wide information lives in Settings (dashboard: Site Settings), returned by `GET /api/public/settings?lang=en|ar` grouped by `group`:
+
+| Group | Keys |
+| --- | --- |
+| `general` | `site_name`, `site_logo` (image URL or `null`), `app_store_url`, `google_play_url`, plus the existing contact keys |
+| `footer` | `footer_description_1`, `footer_description_2`, `footer_copyright` (all translatable), plus the existing footer keys |
+| `social` | `social_behance`, `social_instagram`, `social_linkedin`, `social_twitter`, `social_facebook`, `social_youtube` |
+
+A **translatable setting** is a `Json` setting whose value is an `{"en": "...", "ar": "..."}` map. `SettingResource` returns the string for the request locale, and Site Settings shows one input per locale instead of raw JSON. A Json setting whose value is *not* a locale map stays a plain textarea.
+
+The On Mobile section's store links and the Settings store links are independent values. Update both if the app links change.
+
+`CmsSeeder` uses `updateOrCreate` on `key`, so re-running it resets every listed setting (including an uploaded logo and edited copy) to its default. Do not re-run it on an environment with real settings.
 
 ## 14. Adding a dashboard page — complete checklist
 

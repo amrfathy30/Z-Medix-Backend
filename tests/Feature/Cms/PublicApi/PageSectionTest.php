@@ -83,14 +83,14 @@ class PageSectionTest extends TestCase
     {
         $page = $this->publishedPage('home');
         PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'hero', 'status' => ContentStatus::Published]);
-        PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'faq', 'status' => ContentStatus::Draft]);
+        PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'plans', 'status' => ContentStatus::Draft]);
 
         $response = $this->getJson($this->url('home'))->assertOk();
 
         $keys = collect($response->json('data.sections'))->pluck('section_key')->all();
 
         $this->assertContains('hero', $keys);
-        $this->assertNotContains('faq', $keys);
+        $this->assertNotContains('plans', $keys);
     }
 
     public function test_sections_are_sorted_by_sort_order(): void
@@ -98,13 +98,13 @@ class PageSectionTest extends TestCase
         $page = $this->publishedPage('home');
         PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'hero', 'sort_order' => 2]);
         PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'features', 'sort_order' => 1]);
-        PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'faq', 'sort_order' => 3]);
+        PageSection::factory()->create(['page_id' => $page->id, 'section_key' => 'plans', 'sort_order' => 3]);
 
         $response = $this->getJson($this->url('home'))->assertOk();
 
         $keys = collect($response->json('data.sections'))->pluck('section_key')->all();
 
-        $this->assertSame(['features', 'hero', 'faq'], $keys);
+        $this->assertSame(['features', 'hero', 'plans'], $keys);
     }
 
     public function test_media_urls_are_included_when_media_exists(): void

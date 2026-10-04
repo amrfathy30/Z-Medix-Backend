@@ -57,16 +57,44 @@ class PageSectionSeeder extends Seeder
     {
         $page = Page::query()->where('key', $pageKey)->first();
 
-        if ($page !== null) {
-            return $page;
+        if ($page === null) {
+            $page = Page::create([
+                'key' => $pageKey,
+                'label' => $definition->labelEn,
+                'status' => ContentStatus::Published,
+                'sort_order' => 0,
+            ]);
         }
 
-        return Page::create([
-            'key' => $pageKey,
-            'label' => $definition->labelEn,
-            'status' => ContentStatus::Published,
-            'sort_order' => 0,
-        ]);
+        $this->fillEmptyPageMetadata($page, $definition);
+
+        return $page;
+    }
+
+    /**
+     * Same seed-once rule as section content: default SEO copy and the
+     * publish date are only written into fields that are still empty, so a
+     * value an admin edited is never overwritten. Written explicitly here
+     * because DatabaseSeeder runs with model events disabled, which skips
+     * Page's own `published_at` hook. `public_path` is deliberately not
+     * seeded: it feeds the sitemap and hreflang, so it must match the real
+     * frontend URLs.
+     */
+    private function fillEmptyPageMetadata(Page $page, PageContentDefinition $definition): void
+    {
+        foreach (['meta_title', 'meta_description'] as $attribute) {
+            if (isset($definition->seo[$attribute]) && $page->getTranslations($attribute) === []) {
+                $page->setTranslations($attribute, $definition->seo[$attribute]);
+            }
+        }
+
+        if ($page->status === ContentStatus::Published && $page->published_at === null) {
+            $page->published_at = now();
+        }
+
+        if ($page->isDirty()) {
+            $page->saveQuietly();
+        }
     }
 
     private function seedSection(Page $page, ContentSectionDefinition $section): void

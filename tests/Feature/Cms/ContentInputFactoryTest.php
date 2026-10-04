@@ -10,9 +10,12 @@ use App\Support\Content\Forms\ContentInputFactory;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Group;
+use LogicException;
+use ReflectionMethod;
 use Tests\TestCase;
 
 class ContentInputFactoryTest extends TestCase
@@ -172,6 +175,123 @@ class ContentInputFactoryTest extends TestCase
         );
 
         $this->assertContains('label', $nestedNames);
+    }
+
+    private function imageItem(string $key, array $settings = []): ContentItemDefinition
+    {
+        return ContentItemDefinition::make([
+            'key' => $key,
+            'type' => ContentInputType::Image,
+            'label_en' => 'Icon',
+            'label_ar' => 'الأيقونة',
+            'settings' => $settings,
+        ]);
+    }
+
+    public function test_image_inside_a_repeater_is_a_plain_upload_not_bound_to_a_media_collection(): void
+    {
+        $item = ContentItemDefinition::make([
+            'key' => 'features',
+            'type' => ContentInputType::Repeater,
+            'label_en' => 'Features',
+            'label_ar' => 'الميزات',
+            'schema' => [$this->imageItem('icon')],
+        ]);
+
+        $component = $this->factory->make($item, 'data');
+        [$icon] = $component->getDefaultChildComponents();
+
+        $this->assertInstanceOf(FileUpload::class, $icon);
+        $this->assertNotInstanceOf(SpatieMediaLibraryFileUpload::class, $icon);
+        $this->assertSame('icon', $icon->getName());
+        $this->assertSame('filament_public', $icon->getDiskName());
+    }
+
+    public function test_only_images_can_be_nested_in_a_repeater(): void
+    {
+        $item = ContentItemDefinition::make([
+            'key' => 'rows',
+            'type' => ContentInputType::Repeater,
+            'label_en' => 'Rows',
+            'label_ar' => 'صفوف',
+            'schema' => [ContentItemDefinition::make([
+                'key' => 'attachment',
+                'type' => ContentInputType::File,
+                'label_en' => 'Attachment',
+                'label_ar' => 'مرفق',
+            ])],
+        ]);
+
+        $this->expectException(LogicException::class);
+
+        $this->factory->make($item, 'data');
+    }
+
+    public function test_repeater_applies_min_and_max_items_settings(): void
+    {
+        $item = ContentItemDefinition::make([
+            'key' => 'plans',
+            'type' => ContentInputType::Repeater,
+            'label_en' => 'Plans',
+            'label_ar' => 'الباقات',
+            'settings' => ['min_items' => 1, 'max_items' => 6],
+            'schema' => [ContentItemDefinition::make([
+                'key' => 'label',
+                'type' => ContentInputType::ShortText,
+                'label_en' => 'Label',
+                'label_ar' => 'التسمية',
+            ])],
+        ]);
+
+        $component = $this->factory->make($item, 'data');
+
+        $this->assertSame(1, $component->getMinItems());
+        $this->assertSame(6, $component->getMaxItems());
+    }
+
+    public function test_repeater_without_limits_stays_unbounded(): void
+    {
+        $item = ContentItemDefinition::make([
+            'key' => 'items',
+            'type' => ContentInputType::Repeater,
+            'label_en' => 'Items',
+            'label_ar' => 'العناصر',
+        ]);
+
+        $component = $this->factory->make($item, 'data');
+
+        $this->assertNull($component->getMaxItems());
+    }
+
+    public function test_multi_image_applies_max_files_setting_and_collection_override(): void
+    {
+        $item = ContentItemDefinition::make([
+            'key' => 'supporting_images',
+            'type' => ContentInputType::MultiImage,
+            'label_en' => 'Supporting Images',
+            'label_ar' => 'الصور الداعمة',
+            'settings' => ['collection' => 'gallery', 'max_files' => 4],
+        ]);
+
+        $component = $this->factory->make($item, 'data');
+
+        $this->assertInstanceOf(SpatieMediaLibraryFileUpload::class, $component);
+        $this->assertSame('supporting_images', $component->getName());
+        $this->assertSame('gallery', $component->getCollection());
+        $this->assertSame(4, $component->getMaxFiles());
+    }
+
+    public function test_repeater_row_label_uses_the_current_locale_then_english_then_plain_strings(): void
+    {
+        $rowLabel = new ReflectionMethod(ContentInputFactory::class, 'rowLabel');
+
+        app()->setLocale('ar');
+        $this->assertSame('عنوان', $rowLabel->invoke($this->factory, ['en' => 'Title', 'ar' => 'عنوان']));
+        $this->assertSame('Title', $rowLabel->invoke($this->factory, ['en' => 'Title']));
+
+        $this->assertSame('Plain', $rowLabel->invoke($this->factory, 'Plain'));
+        $this->assertNull($rowLabel->invoke($this->factory, ['en' => '']));
+        $this->assertNull($rowLabel->invoke($this->factory, null));
     }
 
     public function test_missing_definition_for_unknown_page_throws_via_registry(): void

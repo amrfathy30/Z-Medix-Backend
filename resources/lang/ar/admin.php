@@ -243,6 +243,9 @@ return [
         'settings_keys' => [
             // General
             'site_name' => 'اسم الموقع',
+            'site_logo' => 'شعار الموقع',
+            'app_store_url' => 'رابط App Store',
+            'google_play_url' => 'رابط Google Play',
             'site_tagline' => 'شعار الموقع',
             'contact_email' => 'بريد التواصل',
             'support_email' => 'بريد الدعم',
@@ -263,12 +266,15 @@ return [
             // Footer
             'footer_contact_email' => 'بريد التواصل في التذييل',
             'footer_copyright' => 'نص حقوق النشر',
+            'footer_description_1' => 'الوصف الأول في التذييل',
+            'footer_description_2' => 'الوصف الثاني في التذييل',
             'footer_customer_services_title' => 'عنوان عمود — خدمة العملاء',
             'footer_quick_links_title' => 'عنوان عمود — روابط سريعة',
 
             // Social
             'social_twitter' => 'رابط تويتر / X',
             'social_linkedin' => 'رابط لينكدإن',
+            'social_behance' => 'رابط بيهانس',
             'social_instagram' => 'رابط إنستغرام',
             'social_facebook' => 'رابط فيسبوك',
             'social_youtube' => 'رابط يوتيوب',

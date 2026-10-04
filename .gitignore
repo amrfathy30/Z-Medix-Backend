@@ -24,7 +24,7 @@ Homestead.yaml
 Thumbs.db
 /docs/core-extraction-audit-report.md
 /docs/website-content-core-extraction.md
-
+/design
 # AI / agent local tooling
 .agents/
 .ai/

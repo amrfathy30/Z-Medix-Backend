@@ -251,12 +251,15 @@ class PageSectionResourceTest extends TestCase
             ->assertOk()
             ->assertFormFieldExists('data.title.en')
             ->assertFormFieldExists('data.title.ar')
-            ->assertFormFieldExists('data.subtitle.en')
-            ->assertFormFieldExists('data.body.en')
-            ->assertFormFieldExists('data.primary_cta_text.en')
-            ->assertFormFieldExists('data.secondary_cta_text.en')
-            ->assertFormFieldExists('background')
-            // Not defined for home/hero: no repeater, no generic cta composite, no other media collections.
+            ->assertFormFieldExists('data.description.en')
+            ->assertFormFieldExists('data.description.ar')
+            ->assertFormFieldExists('image')
+            ->assertFormFieldExists('image_small')
+            // Not defined for home/hero: no old placeholder fields, no repeater, no generic cta composite, no other media collections.
+            ->assertFormFieldDoesNotExist('data.subtitle.en')
+            ->assertFormFieldDoesNotExist('data.body.en')
+            ->assertFormFieldDoesNotExist('data.primary_cta_text.en')
+            ->assertFormFieldDoesNotExist('background')
             ->assertFormFieldDoesNotExist('data.items')
             ->assertFormFieldDoesNotExist('data.cta.url')
             ->assertFormFieldDoesNotExist('icon')
@@ -264,8 +267,7 @@ class PageSectionResourceTest extends TestCase
             ->assertFormFieldDoesNotExist('video')
             // No root state paths remain — every item writes under `data`.
             ->assertFormFieldDoesNotExist('title.en')
-            ->assertFormFieldDoesNotExist('subtitle.en')
-            ->assertFormFieldDoesNotExist('body.en');
+            ->assertFormFieldDoesNotExist('description.en');
     }
 
     public function test_section_without_cta_definition_does_not_render_cta_inputs(): void
@@ -337,7 +339,7 @@ class PageSectionResourceTest extends TestCase
     public function test_media_field_appears_only_when_defined_for_the_section(): void
     {
         $admin = $this->superAdmin();
-        $heroSection = $this->section('home', 'hero');
+        $heroSection = $this->section('about-us', 'hero');
         $missionSection = $this->section('about-us', 'mission');
 
         Livewire::actingAs($admin, 'admin')
@@ -361,14 +363,14 @@ class PageSectionResourceTest extends TestCase
             ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
             ->fillForm([
                 'data.title.en' => 'Hero Updated By Content Manager',
-                'data.subtitle.en' => 'Updated subtitle',
+                'data.description.en' => 'Updated description',
             ])
             ->call('save')
             ->assertHasNoFormErrors();
 
         $section->refresh();
         $this->assertSame('Hero Updated By Content Manager', $section->data['title']['en']);
-        $this->assertSame('Updated subtitle', $section->data['subtitle']['en']);
+        $this->assertSame('Updated description', $section->data['description']['en']);
         $this->assertSame('hero', $section->section_key);
         $this->assertSame(ContentStatus::Published, $section->status);
         $this->assertSame(3, $section->sort_order);
@@ -465,7 +467,7 @@ class PageSectionResourceTest extends TestCase
         Storage::fake('filament_public');
 
         $admin = $this->superAdmin();
-        $section = $this->section('home', 'hero');
+        $section = $this->section('about-us', 'hero');
 
         Livewire::actingAs($admin, 'admin')
             ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
@@ -474,6 +476,107 @@ class PageSectionResourceTest extends TestCase
             ->assertHasNoFormErrors();
 
         $this->assertSame(1, $section->getMedia('background')->count());
+    }
+
+    // ─── Landing page sections ─────────────────────────────────────────────────
+
+    public function test_landing_sections_render_their_generated_fields(): void
+    {
+        $expected = [
+            'features' => ['data.title.en', 'data.description.ar', 'data.features'],
+            'plans' => ['data.title.en', 'data.description.en', 'data.plans'],
+            'ai_assistant' => ['data.subtitle.en', 'data.title.ar', 'data.description.en', 'image', 'supporting_images', 'logo', 'data.highlights'],
+            'on_mobile' => ['data.subtitle.en', 'data.title.en', 'data.description.en', 'image'],
+        ];
+
+        foreach ($expected as $sectionKey => $fields) {
+            $test = Livewire::actingAs($this->superAdmin(), 'admin')
+                ->test(EditPageSection::class, ['record' => $this->section('home', $sectionKey)->getRouteKey()])
+                ->assertOk();
+
+            foreach ($fields as $field) {
+                $test->assertFormFieldExists($field);
+            }
+        }
+    }
+
+    public function test_plan_rows_persist_into_data_json_with_every_field(): void
+    {
+        $section = $this->section('home', 'plans');
+
+        Livewire::actingAs($this->superAdmin(), 'admin')
+            ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
+            ->fillForm(['data.plans' => [[
+                'title' => ['en' => 'Pro Plan', 'ar' => 'باقة برو'],
+                'price' => 49.99,
+                'discount' => 20,
+                'billing_type' => 'yearly',
+                'features' => [['label' => ['en' => 'Offline mode', 'ar' => 'وضع عدم الاتصال']]],
+                'background_color' => '#112233',
+                'icon_color' => '#FFFFFF',
+            ]]])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $plan = $section->refresh()->data['plans'][0];
+        $this->assertSame('Pro Plan', $plan['title']['en']);
+        $this->assertEquals(49.99, $plan['price']);
+        $this->assertEquals(20, $plan['discount']);
+        $this->assertSame('yearly', $plan['billing_type']);
+        $this->assertSame('وضع عدم الاتصال', $plan['features'][0]['label']['ar']);
+        $this->assertSame('#112233', $plan['background_color']);
+        $this->assertSame('#FFFFFF', $plan['icon_color']);
+    }
+
+    public function test_plans_repeater_refuses_more_than_six_rows(): void
+    {
+        $section = $this->section('home', 'plans');
+        $rows = array_fill(0, 7, ['title' => ['en' => 'Plan', 'ar' => 'باقة'], 'billing_type' => 'monthly']);
+
+        Livewire::actingAs($this->superAdmin(), 'admin')
+            ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
+            ->fillForm(['data.plans' => $rows])
+            ->call('save')
+            ->assertHasFormErrors(['data.plans']);
+    }
+
+    public function test_billing_type_only_accepts_monthly_or_yearly(): void
+    {
+        $section = $this->section('home', 'plans');
+
+        Livewire::actingAs($this->superAdmin(), 'admin')
+            ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
+            ->fillForm(['data.plans' => [['title' => ['en' => 'Plan', 'ar' => 'باقة'], 'billing_type' => 'weekly']]])
+            ->call('save')
+            ->assertHasFormErrors();
+    }
+
+    public function test_on_mobile_store_links_are_not_section_fields_because_they_come_from_settings(): void
+    {
+        Livewire::actingAs($this->superAdmin(), 'admin')
+            ->test(EditPageSection::class, ['record' => $this->section('home', 'on_mobile')->getRouteKey()])
+            ->assertFormFieldDoesNotExist('data.app_store_url')
+            ->assertFormFieldDoesNotExist('data.google_play_url');
+    }
+
+    public function test_hero_image_uploads_persist_to_their_own_media_collections(): void
+    {
+        Storage::fake('public');
+        Storage::fake('filament_public');
+
+        $section = $this->section('home', 'hero');
+
+        Livewire::actingAs($this->superAdmin(), 'admin')
+            ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
+            ->fillForm([
+                'image' => UploadedFile::fake()->image('hero.jpg'),
+                'image_small' => UploadedFile::fake()->image('hero-small.jpg'),
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(1, $section->getMedia('image')->count());
+        $this->assertSame(1, $section->getMedia('image_small')->count());
     }
 
     // ─── Permission enforcement ────────────────────────────────────────────────

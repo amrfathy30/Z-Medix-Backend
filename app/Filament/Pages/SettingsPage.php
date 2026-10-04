@@ -12,6 +12,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
@@ -43,6 +44,9 @@ class SettingsPage extends Page
      * through Website Content → Home Page → page_sections.
      */
     private const HIDDEN_GROUPS = ['home'];
+
+    /** Locales edited side by side for a translatable (Json `{en, ar}`) setting. */
+    private const TRANSLATABLE_LOCALES = ['en', 'ar'];
 
     public static function getNavigationLabel(): string
     {
@@ -161,15 +165,24 @@ class SettingsPage extends Page
             }
 
             $value = $state[$key];
-
-            if ($setting->value_type === SettingValueType::Boolean) {
-                $value = $value ? '1' : '0';
-            }
-
             $previous = $setting->value;
 
-            if ((string) $previous === (string) $value) {
-                continue;
+            if ($this->isTranslatable($setting)) {
+                $translations = $this->normalizeTranslations($value);
+
+                if ($translations === $this->translationsOf($setting)) {
+                    continue;
+                }
+
+                $value = json_encode($translations, JSON_UNESCAPED_UNICODE);
+            } else {
+                if ($setting->value_type === SettingValueType::Boolean) {
+                    $value = $value ? '1' : '0';
+                }
+
+                if ((string) $previous === (string) $value) {
+                    continue;
+                }
             }
 
             $setting->update(['value' => (string) $value]);
@@ -220,7 +233,45 @@ class SettingsPage extends Page
             return in_array($setting->value, ['1', 'true'], true);
         }
 
+        if ($this->isTranslatable($setting)) {
+            return $this->translationsOf($setting);
+        }
+
         return $setting->value;
+    }
+
+    /**
+     * A Json setting whose value is an `{en, ar}` map — SettingResource already
+     * resolves these per request locale, so the dashboard edits one input per
+     * locale instead of raw JSON.
+     */
+    private function isTranslatable(Setting $setting): bool
+    {
+        if ($setting->value_type !== SettingValueType::Json) {
+            return false;
+        }
+
+        $decoded = json_decode((string) $setting->value, true);
+
+        return is_array($decoded)
+            && $decoded !== []
+            && array_diff(array_keys($decoded), self::TRANSLATABLE_LOCALES) === [];
+    }
+
+    /** @return array<string, string> Stored translations in fixed locale order, missing locales as ''. */
+    private function translationsOf(Setting $setting): array
+    {
+        return $this->normalizeTranslations(json_decode((string) $setting->value, true));
+    }
+
+    /** @return array<string, string> */
+    private function normalizeTranslations(mixed $value): array
+    {
+        $value = is_array($value) ? $value : [];
+
+        return collect(self::TRANSLATABLE_LOCALES)
+            ->mapWithKeys(fn (string $locale): array => [$locale => (string) ($value[$locale] ?? '')])
+            ->all();
     }
 
     private function makeField(Setting $setting): Component
@@ -228,6 +279,10 @@ class SettingsPage extends Page
         $statePath = "setting_{$setting->id}";
         $label = static::getSettingLabel($setting->key);
         $helperText = $setting->description;
+
+        if ($this->isTranslatable($setting)) {
+            return $this->makeTranslatableField($setting, $statePath, $label, $helperText);
+        }
 
         return match ($setting->value_type) {
             SettingValueType::Boolean => Toggle::make($statePath)
@@ -267,6 +322,20 @@ class SettingsPage extends Page
         };
     }
 
+    private function makeTranslatableField(Setting $setting, string $statePath, string $label, ?string $helperText): Component
+    {
+        $fields = array_map(
+            fn (string $locale): Component => (str_contains($setting->key, 'description')
+                ? Textarea::make("{$statePath}.{$locale}")->rows(3)
+                : TextInput::make("{$statePath}.{$locale}"))
+                ->label("{$label} — ".__("admin.cms.locale_{$locale}"))
+                ->helperText($helperText),
+            self::TRANSLATABLE_LOCALES,
+        );
+
+        return Group::make($fields)->columns(2)->columnSpanFull();
+    }
+
     private function makeStringField(string $statePath, string $label, ?string $helperText, string $key): TextInput
     {
         $field = TextInput::make($statePath)
@@ -277,7 +346,7 @@ class SettingsPage extends Page
             return $field->email();
         }
 
-        if (str_starts_with($key, 'social_')) {
+        if (str_starts_with($key, 'social_') || str_ends_with($key, '_url')) {
             return $field->url();
         }
 
