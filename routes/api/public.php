@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Public\Auth\VerifyEmailOtpController;
 use App\Http\Controllers\Api\Public\Auth\VerifyPasswordResetOtpController;
 use App\Http\Controllers\Api\Public\BlogController;
 use App\Http\Controllers\Api\Public\ContactController;
+use App\Http\Controllers\Api\Public\CountryController;
 use App\Http\Controllers\Api\Public\FaqController;
 use App\Http\Controllers\Api\Public\HomeController;
 use App\Http\Controllers\Api\Public\MarketingPixelController;
@@ -85,3 +86,5 @@ Route::get('settings', [SettingsController::class, 'index'])->name('settings.ind
 Route::get('marketing/analytics', [AnalyticsController::class, 'index'])->name('marketing.analytics.index');
 Route::get('marketing/pixels', [MarketingPixelController::class, 'index'])->name('marketing.pixels.index');
 Route::post('contact', [ContactController::class, 'store'])->name('contact.store');
+Route::get('countries', [CountryController::class, 'index'])->name('countries.index');
+Route::get('countries/{country}/cities', [CountryController::class, 'cities'])->name('countries.cities.index');
