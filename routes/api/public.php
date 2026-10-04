@@ -6,7 +6,12 @@ use App\Http\Controllers\Api\Public\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\Public\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\Public\Auth\LoginController;
 use App\Http\Controllers\Api\Public\Auth\LogoutController;
+use App\Http\Controllers\Api\Public\Auth\RegisterController;
+use App\Http\Controllers\Api\Public\Auth\ResendEmailOtpController;
+use App\Http\Controllers\Api\Public\Auth\ResendPasswordResetOtpController;
 use App\Http\Controllers\Api\Public\Auth\ResetPasswordController;
+use App\Http\Controllers\Api\Public\Auth\VerifyEmailOtpController;
+use App\Http\Controllers\Api\Public\Auth\VerifyPasswordResetOtpController;
 use App\Http\Controllers\Api\Public\BlogController;
 use App\Http\Controllers\Api\Public\ContactController;
 use App\Http\Controllers\Api\Public\FaqController;
@@ -21,9 +26,35 @@ use Illuminate\Support\Facades\Route;
 Route::get('/ping', fn () => response()->json(['message' => 'pong']))->name('ping');
 
 Route::prefix('auth')->name('auth.')->group(function (): void {
+    // Student registration + email OTP activation. Throttles here are coarse abuse
+    // protection; the per-code attempt limit, resend cooldown and hourly send
+    // allowance are enforced by EmailOtpService.
+    Route::post('register', RegisterController::class)
+        ->middleware('throttle:10,1')
+        ->name('register');
+    Route::post('verify-otp', VerifyEmailOtpController::class)
+        ->middleware('throttle:10,1')
+        ->name('verify-otp');
+    Route::post('resend-otp', ResendEmailOtpController::class)
+        ->middleware('throttle:10,1')
+        ->name('resend-otp');
+
     Route::post('login', LoginController::class)->name('login');
-    Route::post('forgot-password', ForgotPasswordController::class)->name('forgot-password');
-    Route::post('reset-password', ResetPasswordController::class)->name('reset-password');
+
+    // Student password reset is email-OTP based. The Filament admin panel keeps its
+    // own link-based reset through the `admins` password broker.
+    Route::post('forgot-password', ForgotPasswordController::class)
+        ->middleware('throttle:10,1')
+        ->name('forgot-password');
+    Route::post('forgot-password/resend', ResendPasswordResetOtpController::class)
+        ->middleware('throttle:10,1')
+        ->name('forgot-password.resend');
+    Route::post('forgot-password/verify-otp', VerifyPasswordResetOtpController::class)
+        ->middleware('throttle:10,1')
+        ->name('forgot-password.verify-otp');
+    Route::post('reset-password', ResetPasswordController::class)
+        ->middleware('throttle:10,1')
+        ->name('reset-password');
 
     Route::get('verify-email/{id}/{hash}', [EmailVerificationController::class, 'verify'])
         ->name('verify-email');
@@ -38,7 +69,7 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 
 Route::middleware('auth:sanctum')->name('profile.')->group(function (): void {
     Route::get('profile', [ProfileController::class, 'show'])->name('show');
-    Route::patch('profile', [ProfileController::class, 'update'])->name('update');
+    Route::post('profile', [ProfileController::class, 'update'])->name('update');
 });
 
 // ── CMS Public Endpoints ──────────────────────────────────────────────────────

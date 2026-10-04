@@ -16,13 +16,25 @@ trait ApiResponse
         ], $status);
     }
 
-    public function errorResponse(string $message = 'Error.', array $errors = [], int $status = 400): JsonResponse
+    /**
+     * @param  array<string, mixed>  $errors
+     * @param  string|null  $code  Stable machine-readable identifier for the failure.
+     *                             Omitted from the payload when null, so existing
+     *                             error responses are unchanged.
+     */
+    public function errorResponse(string $message = 'Error.', array $errors = [], int $status = 400, ?string $code = null): JsonResponse
     {
-        return response()->json([
+        $payload = [
             'success' => false,
             'message' => $message,
             'errors' => $errors,
-        ], $status);
+        ];
+
+        if ($code !== null) {
+            $payload['code'] = $code;
+        }
+
+        return response()->json($payload, $status);
     }
 
     public function paginatedResponse(ResourceCollection $resourceCollection, string $message = 'Success.'): JsonResponse

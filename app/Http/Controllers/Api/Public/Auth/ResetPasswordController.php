@@ -2,32 +2,31 @@
 
 namespace App\Http\Controllers\Api\Public\Auth;
 
+use App\Exceptions\Auth\PasswordResetException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Public\Auth\ResetPasswordRequest;
-use App\Models\User;
+use App\Services\Auth\PasswordResetService;
 use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
 
+/**
+ * Consumes a single-use reset token and sets the new password.
+ */
 class ResetPasswordController extends Controller
 {
     use ApiResponse;
 
-    public function __invoke(ResetPasswordRequest $request): JsonResponse
+    public function __invoke(ResetPasswordRequest $request, PasswordResetService $passwordReset): JsonResponse
     {
-        $status = Password::broker('users')->reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user, string $password): void {
-                $user->forceFill(['password' => Hash::make($password)])->save();
-                $user->tokens()->delete();
-            }
-        );
-
-        if ($status === Password::PasswordReset) {
-            return $this->successResponse(null, __($status));
+        try {
+            $passwordReset->resetPassword(
+                $request->string('reset_token')->value(),
+                $request->string('password')->value(),
+            );
+        } catch (PasswordResetException $e) {
+            return $this->errorResponse($e->getMessage(), [], $e->status, $e->errorCode);
         }
 
-        return $this->errorResponse(__($status), ['email' => [__($status)]], 422);
+        return $this->successResponse(null, 'Your password has been reset. Please sign in with your new password.');
     }
 }

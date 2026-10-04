@@ -401,9 +401,12 @@ class AdminProfileTest extends TestCase
 
     // ─── Safety Guards ────────────────────────────────────────────────────────
 
-    public function test_no_registration_routes_exist(): void
+    public function test_registration_is_only_exposed_on_the_public_auth_prefix(): void
     {
-        $this->postJson('/api/public/auth/register', [])->assertStatus(404);
+        // Student registration now exists; 422 proves the route is reachable and
+        // validated. It must not be mirrored on the admin prefix.
+        $this->postJson('/api/public/auth/register', [])->assertStatus(422);
+        $this->postJson('/api/admin/auth/register', [])->assertStatus(404);
     }
 
     public function test_no_phone_otp_login_routes_exist(): void

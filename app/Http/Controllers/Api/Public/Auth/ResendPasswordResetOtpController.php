@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Public\Auth;
 
+use App\Enums\OtpPurpose;
 use App\Exceptions\Auth\EmailOtpException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Public\Auth\ForgotPasswordRequest;
@@ -10,16 +11,16 @@ use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Starts the student password reset flow by emailing a one-time passcode.
+ * Re-issues a password reset passcode, invalidating any previous pending one.
  */
-class ForgotPasswordController extends Controller
+class ResendPasswordResetOtpController extends Controller
 {
     use ApiResponse;
 
     public function __invoke(ForgotPasswordRequest $request, EmailOtpService $emailOtp): JsonResponse
     {
         try {
-            $emailOtp->sendForPasswordReset($request->string('email')->value(), [
+            $emailOtp->resend($request->string('email')->value(), OtpPurpose::PasswordReset, [
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
@@ -27,8 +28,6 @@ class ForgotPasswordController extends Controller
             return $this->errorResponse($e->getMessage(), [], $e->status, $e->errorCode);
         }
 
-        // Always generic: the same response is returned whether or not the address
-        // belongs to an account eligible for a password reset.
         return $this->successResponse(
             null,
             'If that email address is in our system, we have sent a password reset code.',
