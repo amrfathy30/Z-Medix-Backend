@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\DebugController;
 use App\Http\Controllers\SitemapController;
+use App\Http\Controllers\SystemLogController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
