@@ -54,6 +54,45 @@ class RolesPermissionsSeeder extends Seeder
             // editing integration credentials.
             'reports.view' => ['display_name_ar' => 'عرض التقارير', 'display_name_en' => 'View Reports'],
 
+            // Subject learning content (subjects -> chapters -> pages/quizzes -> questions,
+            // and subjects -> books -> pages).
+            // Deliberately outside the content.* family: this is product study
+            // material, not marketing website content.
+            'subjects.view' => ['display_name_ar' => 'عرض المواد', 'display_name_en' => 'View Subjects'],
+            'subjects.create' => ['display_name_ar' => 'إنشاء المواد', 'display_name_en' => 'Create Subjects'],
+            'subjects.update' => ['display_name_ar' => 'تعديل المواد', 'display_name_en' => 'Update Subjects'],
+            'subjects.delete' => ['display_name_ar' => 'حذف المواد', 'display_name_en' => 'Delete Subjects'],
+
+            'chapters.view' => ['display_name_ar' => 'عرض الفصول', 'display_name_en' => 'View Chapters'],
+            'chapters.create' => ['display_name_ar' => 'إنشاء الفصول', 'display_name_en' => 'Create Chapters'],
+            'chapters.update' => ['display_name_ar' => 'تعديل الفصول', 'display_name_en' => 'Update Chapters'],
+            'chapters.delete' => ['display_name_ar' => 'حذف الفصول', 'display_name_en' => 'Delete Chapters'],
+
+            'chapter_pages.view' => ['display_name_ar' => 'عرض صفحات الفصول', 'display_name_en' => 'View Chapter Pages'],
+            'chapter_pages.create' => ['display_name_ar' => 'إنشاء صفحات الفصول', 'display_name_en' => 'Create Chapter Pages'],
+            'chapter_pages.update' => ['display_name_ar' => 'تعديل صفحات الفصول', 'display_name_en' => 'Update Chapter Pages'],
+            'chapter_pages.delete' => ['display_name_ar' => 'حذف صفحات الفصول', 'display_name_en' => 'Delete Chapter Pages'],
+
+            'books.view' => ['display_name_ar' => 'عرض الكتب', 'display_name_en' => 'View Books'],
+            'books.create' => ['display_name_ar' => 'إنشاء الكتب', 'display_name_en' => 'Create Books'],
+            'books.update' => ['display_name_ar' => 'تعديل الكتب', 'display_name_en' => 'Update Books'],
+            'books.delete' => ['display_name_ar' => 'حذف الكتب', 'display_name_en' => 'Delete Books'],
+
+            'book_pages.view' => ['display_name_ar' => 'عرض صفحات الكتب', 'display_name_en' => 'View Book Pages'],
+            'book_pages.create' => ['display_name_ar' => 'إنشاء صفحات الكتب', 'display_name_en' => 'Create Book Pages'],
+            'book_pages.update' => ['display_name_ar' => 'تعديل صفحات الكتب', 'display_name_en' => 'Update Book Pages'],
+            'book_pages.delete' => ['display_name_ar' => 'حذف صفحات الكتب', 'display_name_en' => 'Delete Book Pages'],
+
+            'quizzes.view' => ['display_name_ar' => 'عرض الاختبارات', 'display_name_en' => 'View Quizzes'],
+            'quizzes.create' => ['display_name_ar' => 'إنشاء الاختبارات', 'display_name_en' => 'Create Quizzes'],
+            'quizzes.update' => ['display_name_ar' => 'تعديل الاختبارات', 'display_name_en' => 'Update Quizzes'],
+            'quizzes.delete' => ['display_name_ar' => 'حذف الاختبارات', 'display_name_en' => 'Delete Quizzes'],
+
+            'questions.view' => ['display_name_ar' => 'عرض الأسئلة', 'display_name_en' => 'View Questions'],
+            'questions.create' => ['display_name_ar' => 'إنشاء الأسئلة', 'display_name_en' => 'Create Questions'],
+            'questions.update' => ['display_name_ar' => 'تعديل الأسئلة', 'display_name_en' => 'Update Questions'],
+            'questions.delete' => ['display_name_ar' => 'حذف الأسئلة', 'display_name_en' => 'Delete Questions'],
+
             // Contact messages
             'contact_messages.view' => ['display_name_ar' => 'عرض الرسائل', 'display_name_en' => 'View Contact Messages'],
             'contact_messages.update' => ['display_name_ar' => 'تعديل الرسائل', 'display_name_en' => 'Update Contact Messages'],
@@ -97,6 +136,13 @@ class RolesPermissionsSeeder extends Seeder
             'roles.view',
             'content.view',
             'reports.view',
+            'subjects.view',
+            'chapters.view',
+            'chapter_pages.view',
+            'books.view',
+            'book_pages.view',
+            'quizzes.view',
+            'questions.view',
         ]);
 
         $contentManager->syncPermissions([
@@ -111,6 +157,34 @@ class RolesPermissionsSeeder extends Seeder
             'settings.update',
             'contact_messages.view',
             'contact_messages.update',
+            'subjects.view',
+            'subjects.create',
+            'subjects.update',
+            'subjects.delete',
+            'chapters.view',
+            'chapters.create',
+            'chapters.update',
+            'chapters.delete',
+            'chapter_pages.view',
+            'chapter_pages.create',
+            'chapter_pages.update',
+            'chapter_pages.delete',
+            'books.view',
+            'books.create',
+            'books.update',
+            'books.delete',
+            'book_pages.view',
+            'book_pages.create',
+            'book_pages.update',
+            'book_pages.delete',
+            'quizzes.view',
+            'quizzes.create',
+            'quizzes.update',
+            'quizzes.delete',
+            'questions.view',
+            'questions.create',
+            'questions.update',
+            'questions.delete',
         ]);
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

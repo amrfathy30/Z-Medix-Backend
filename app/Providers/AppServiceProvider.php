@@ -7,21 +7,37 @@ use App\Contracts\PhoneVerificationProviderInterface;
 use App\Models\Admin;
 use App\Models\Blog;
 use App\Models\BlogCategory;
+use App\Models\Book;
+use App\Models\BookPage;
+use App\Models\Chapter;
+use App\Models\ChapterPage;
 use App\Models\ContactMessage;
 use App\Models\Faq;
 use App\Models\FaqCategory;
 use App\Models\Page;
 use App\Models\PageSection;
 use App\Models\PageSectionItem;
+use App\Models\Question;
+use App\Models\QuestionOption;
+use App\Models\Quiz;
+use App\Models\Subject;
 use App\Models\User;
 use App\Policies\BlogCategoryPolicy;
 use App\Policies\BlogPolicy;
+use App\Policies\BookPagePolicy;
+use App\Policies\BookPolicy;
+use App\Policies\ChapterPagePolicy;
+use App\Policies\ChapterPolicy;
 use App\Policies\ContactMessagePolicy;
 use App\Policies\FaqCategoryPolicy;
 use App\Policies\FaqPolicy;
 use App\Policies\PagePolicy;
 use App\Policies\PageSectionItemPolicy;
 use App\Policies\PageSectionPolicy;
+use App\Policies\QuestionOptionPolicy;
+use App\Policies\QuestionPolicy;
+use App\Policies\QuizPolicy;
+use App\Policies\SubjectPolicy;
 use App\Services\Phone\Providers\TwilioVerifyProvider;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -86,6 +102,14 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Faq::class, FaqPolicy::class);
         Gate::policy(FaqCategory::class, FaqCategoryPolicy::class);
         Gate::policy(ContactMessage::class, ContactMessagePolicy::class);
+        Gate::policy(Subject::class, SubjectPolicy::class);
+        Gate::policy(Chapter::class, ChapterPolicy::class);
+        Gate::policy(Book::class, BookPolicy::class);
+        Gate::policy(BookPage::class, BookPagePolicy::class);
+        Gate::policy(ChapterPage::class, ChapterPagePolicy::class);
+        Gate::policy(Quiz::class, QuizPolicy::class);
+        Gate::policy(Question::class, QuestionPolicy::class);
+        Gate::policy(QuestionOption::class, QuestionOptionPolicy::class);
 
         Relation::enforceMorphMap([
             'user' => User::class,
@@ -94,6 +118,14 @@ class AppServiceProvider extends ServiceProvider
             'page_section' => PageSection::class,
             'page_section_item' => PageSectionItem::class,
             'blog' => Blog::class,
+            'subject' => Subject::class,
+            'chapter' => Chapter::class,
+            'book' => Book::class,
+            'book_page' => BookPage::class,
+            'chapter_page' => ChapterPage::class,
+            'quiz' => Quiz::class,
+            'question' => Question::class,
+            'question_option' => QuestionOption::class,
         ]);
     }
 }
