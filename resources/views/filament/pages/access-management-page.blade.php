@@ -1,6 +1,7 @@
 <x-filament-panels::page>
 
     {{-- ===== Roles section ===== --}}
+    @if ($this->canViewRoles())
     <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
         <div class="fi-section-header flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-4">
             <div class="grid flex-1 gap-y-1">
@@ -60,6 +61,7 @@
             @endif
         </div>
     </div>
+    @endif
 
     {{-- ===== Admins table ===== --}}
     <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">

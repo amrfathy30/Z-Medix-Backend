@@ -23,6 +23,8 @@ class EditFaq extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        FaqResource::assertMayApplyStatus($data, $this->record);
+
         $data['updated_by_admin_id'] = auth('admin')->id();
 
         return $data;

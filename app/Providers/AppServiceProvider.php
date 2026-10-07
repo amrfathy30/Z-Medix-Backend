@@ -20,6 +20,7 @@ use App\Models\PageSectionItem;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\Quiz;
+use App\Models\ReportCase;
 use App\Models\Subject;
 use App\Models\User;
 use App\Policies\BlogCategoryPolicy;
@@ -37,6 +38,7 @@ use App\Policies\PageSectionPolicy;
 use App\Policies\QuestionOptionPolicy;
 use App\Policies\QuestionPolicy;
 use App\Policies\QuizPolicy;
+use App\Policies\ReportCasePolicy;
 use App\Policies\SubjectPolicy;
 use App\Services\Phone\Providers\TwilioVerifyProvider;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
@@ -110,6 +112,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Quiz::class, QuizPolicy::class);
         Gate::policy(Question::class, QuestionPolicy::class);
         Gate::policy(QuestionOption::class, QuestionOptionPolicy::class);
+        Gate::policy(ReportCase::class, ReportCasePolicy::class);
 
         Relation::enforceMorphMap([
             'user' => User::class,
@@ -126,6 +129,7 @@ class AppServiceProvider extends ServiceProvider
             'quiz' => Quiz::class,
             'question' => Question::class,
             'question_option' => QuestionOption::class,
+            'report_case' => ReportCase::class,
         ]);
     }
 }

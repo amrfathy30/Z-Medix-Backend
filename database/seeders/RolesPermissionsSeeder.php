@@ -93,6 +93,14 @@ class RolesPermissionsSeeder extends Seeder
             'questions.update' => ['display_name_ar' => 'تعديل الأسئلة', 'display_name_en' => 'Update Questions'],
             'questions.delete' => ['display_name_ar' => 'حذف الأسئلة', 'display_name_en' => 'Delete Questions'],
 
+            // Report cases — admin-authored case write-ups with their source PDF,
+            // read by students. Its own permission family, like the rest of the
+            // learning content.
+            'report_cases.view' => ['display_name_ar' => 'عرض الحالات', 'display_name_en' => 'View Report Cases'],
+            'report_cases.create' => ['display_name_ar' => 'إنشاء الحالات', 'display_name_en' => 'Create Report Cases'],
+            'report_cases.update' => ['display_name_ar' => 'تعديل الحالات', 'display_name_en' => 'Update Report Cases'],
+            'report_cases.delete' => ['display_name_ar' => 'حذف الحالات', 'display_name_en' => 'Delete Report Cases'],
+
             // Contact messages
             'contact_messages.view' => ['display_name_ar' => 'عرض الرسائل', 'display_name_en' => 'View Contact Messages'],
             'contact_messages.update' => ['display_name_ar' => 'تعديل الرسائل', 'display_name_en' => 'Update Contact Messages'],
@@ -143,6 +151,12 @@ class RolesPermissionsSeeder extends Seeder
             'book_pages.view',
             'quizzes.view',
             'questions.view',
+            // Report cases are the one learning entity the admin role manages
+            // outright, not just reads.
+            'report_cases.view',
+            'report_cases.create',
+            'report_cases.update',
+            'report_cases.delete',
         ]);
 
         $contentManager->syncPermissions([
@@ -185,6 +199,10 @@ class RolesPermissionsSeeder extends Seeder
             'questions.create',
             'questions.update',
             'questions.delete',
+            'report_cases.view',
+            'report_cases.create',
+            'report_cases.update',
+            'report_cases.delete',
         ]);
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

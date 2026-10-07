@@ -7,6 +7,7 @@ use App\Filament\Resources\BlogCategoryResource\Pages\CreateBlogCategory;
 use App\Filament\Resources\BlogCategoryResource\Pages\EditBlogCategory;
 use App\Filament\Resources\BlogCategoryResource\Pages\ListBlogCategories;
 use App\Models\BlogCategory;
+use App\Support\Filament\Concerns\GuardsContentPublishing;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -30,6 +31,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class BlogCategoryResource extends Resource
 {
+    use GuardsContentPublishing;
+
     protected static ?string $model = BlogCategory::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTag;
@@ -93,13 +96,12 @@ class BlogCategoryResource extends Resource
                             ->maxLength(255),
                         Select::make('status')
                             ->label(__('admin.cms.field_status'))
-                            ->options([
-                                ContentStatus::Draft->value => __('admin.cms.status_draft'),
-                                ContentStatus::Published->value => __('admin.cms.status_published'),
-                                ContentStatus::Archived->value => __('admin.cms.status_archived'),
-                            ])
+                            ->options(fn (?BlogCategory $record): array => self::publishableStatusOptions($record))
+                            ->disabled(fn (?BlogCategory $record): bool => self::isStatusLocked($record))
+                            ->dehydrated(true)
+                            ->helperText(fn (?BlogCategory $record): ?string => self::statusLockedHint($record))
                             ->required()
-                            ->default(ContentStatus::Published->value),
+                            ->default(fn (): string => self::defaultPublishableStatus(ContentStatus::Published)),
                         TextInput::make('sort_order')
                             ->label(__('admin.cms.field_sort_order'))
                             ->integer()
