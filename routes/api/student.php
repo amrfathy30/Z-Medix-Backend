@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\Student\ChapterController;
 use App\Http\Controllers\Api\Student\ChapterPageController;
 use App\Http\Controllers\Api\Student\ChapterQuizController;
+use App\Http\Controllers\Api\Student\HighlightController;
+use App\Http\Controllers\Api\Student\NoteController;
 use App\Http\Controllers\Api\Student\QuizAnswerController;
 use App\Http\Controllers\Api\Student\QuizAttemptController;
 use App\Http\Controllers\Api\Student\ReportCaseController;
@@ -29,6 +31,18 @@ Route::prefix('study')->name('study.')->group(function (): void {
     Route::get('chapters/{chapter}', [ChapterController::class, 'show'])->name('chapters.show');
     Route::get('chapter-pages/{chapterPage}', [ChapterPageController::class, 'show'])->name('chapter-pages.show');
     Route::post('chapter-pages/{chapterPage}/complete', [ChapterPageController::class, 'complete'])->name('chapter-pages.complete');
+
+    // What the student marks up while reading. Both are anchored by the text
+    // they selected, which is stored: the page they belong to is addressed on
+    // creation and listing, the record itself once it exists.
+    Route::get('chapter-pages/{chapterPage}/highlights', [HighlightController::class, 'index'])->name('chapter-pages.highlights.index');
+    Route::post('chapter-pages/{chapterPage}/highlights', [HighlightController::class, 'store'])->name('chapter-pages.highlights.store');
+    Route::delete('highlights/{highlight}', [HighlightController::class, 'destroy'])->name('highlights.destroy');
+
+    Route::get('chapter-pages/{chapterPage}/notes', [NoteController::class, 'index'])->name('chapter-pages.notes.index');
+    Route::post('chapter-pages/{chapterPage}/notes', [NoteController::class, 'store'])->name('chapter-pages.notes.store');
+    Route::patch('notes/{note}', [NoteController::class, 'update'])->name('notes.update');
+    Route::delete('notes/{note}', [NoteController::class, 'destroy'])->name('notes.destroy');
 
     // Starts a new attempt, or resumes the one left in progress.
     Route::post('chapters/{chapter}/quiz/start', ChapterQuizController::class)->name('chapters.quiz.start');
