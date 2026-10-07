@@ -140,4 +140,24 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     {
         return $this->hasMany(StudentStudyPosition::class);
     }
+
+    /**
+     * Text the student has highlighted while reading, newest first.
+     */
+    public function highlights(): HasMany
+    {
+        return $this->hasMany(StudentHighlight::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * Notes the student has written while reading, newest first.
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(StudentNote::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
 }

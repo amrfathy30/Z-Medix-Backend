@@ -7,6 +7,7 @@ use App\Models\Concerns\HasSequentialOrder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -38,6 +39,24 @@ class ChapterPage extends Model
     public function chapter(): BelongsTo
     {
         return $this->belongsTo(Chapter::class);
+    }
+
+    /**
+     * Every student's highlights on this page. Student endpoints always read
+     * through {@see StudentHighlight::scopeForStudent()} instead.
+     */
+    public function highlights(): HasMany
+    {
+        return $this->hasMany(StudentHighlight::class);
+    }
+
+    /**
+     * Every student's notes on this page. Student endpoints always read through
+     * {@see StudentNote::scopeForStudent()} instead.
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(StudentNote::class);
     }
 
     /**
