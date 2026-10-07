@@ -45,6 +45,16 @@ class Quiz extends Model
     }
 
     /**
+     * Student runs through this quiz, newest first.
+     */
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class)
+            ->orderByDesc('started_at')
+            ->orderByDesc('id');
+    }
+
+    /**
      * A quiz is only usable for student study once it holds a question.
      */
     public function hasQuestions(): bool

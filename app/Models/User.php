@@ -96,4 +96,48 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     {
         return $this->hasMany(PasswordResetRequest::class);
     }
+
+    /**
+     * Study time the student has logged, newest first.
+     */
+    public function studySessions(): HasMany
+    {
+        return $this->hasMany(StudySession::class)
+            ->orderByDesc('started_at')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * Chapters the student has completed.
+     */
+    public function chapterProgress(): HasMany
+    {
+        return $this->hasMany(StudentChapterProgress::class);
+    }
+
+    /**
+     * Chapter pages the student has marked as read.
+     */
+    public function chapterPageProgress(): HasMany
+    {
+        return $this->hasMany(StudentChapterPageProgress::class);
+    }
+
+    /**
+     * Every quiz run the student has made, newest first.
+     */
+    public function quizAttempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class)
+            ->orderByDesc('started_at')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * Where the student last stopped, one position per subject.
+     */
+    public function studyPositions(): HasMany
+    {
+        return $this->hasMany(StudentStudyPosition::class);
+    }
 }
