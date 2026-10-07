@@ -8,4 +8,11 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateFaqCategory extends CreateRecord
 {
     protected static string $resource = FaqCategoryResource::class;
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        FaqCategoryResource::assertMayApplyStatus($data);
+
+        return $data;
+    }
 }

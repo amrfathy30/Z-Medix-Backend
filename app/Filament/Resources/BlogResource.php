@@ -8,6 +8,7 @@ use App\Filament\Resources\BlogResource\Pages\EditBlog;
 use App\Filament\Resources\BlogResource\Pages\ListBlogs;
 use App\Models\Blog;
 use App\Models\BlogCategory;
+use App\Support\Filament\Concerns\GuardsContentPublishing;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -35,6 +36,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class BlogResource extends Resource
 {
+    use GuardsContentPublishing;
+
     protected static ?string $model = Blog::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedNewspaper;
@@ -132,11 +135,10 @@ class BlogResource extends Resource
                             ->maxLength(255),
                         Select::make('status')
                             ->label(__('admin.cms.field_status'))
-                            ->options([
-                                ContentStatus::Draft->value => __('admin.cms.status_draft'),
-                                ContentStatus::Published->value => __('admin.cms.status_published'),
-                                ContentStatus::Archived->value => __('admin.cms.status_archived'),
-                            ])
+                            ->options(fn (?Blog $record): array => self::publishableStatusOptions($record))
+                            ->disabled(fn (?Blog $record): bool => self::isStatusLocked($record))
+                            ->dehydrated(true)
+                            ->helperText(fn (?Blog $record): ?string => self::statusLockedHint($record))
                             ->required()
                             ->default(ContentStatus::Draft->value),
                         DateTimePicker::make('published_at')

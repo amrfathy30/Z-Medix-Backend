@@ -7,6 +7,7 @@ use App\Filament\Resources\FaqCategoryResource\Pages\CreateFaqCategory;
 use App\Filament\Resources\FaqCategoryResource\Pages\EditFaqCategory;
 use App\Filament\Resources\FaqCategoryResource\Pages\ListFaqCategories;
 use App\Models\FaqCategory;
+use App\Support\Filament\Concerns\GuardsContentPublishing;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -30,6 +31,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class FaqCategoryResource extends Resource
 {
+    use GuardsContentPublishing;
+
     protected static ?string $model = FaqCategory::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedFolderOpen;
@@ -93,13 +96,12 @@ class FaqCategoryResource extends Resource
                             ->maxLength(255),
                         Select::make('status')
                             ->label(__('admin.cms.field_status'))
-                            ->options([
-                                ContentStatus::Draft->value => __('admin.cms.status_draft'),
-                                ContentStatus::Published->value => __('admin.cms.status_published'),
-                                ContentStatus::Archived->value => __('admin.cms.status_archived'),
-                            ])
+                            ->options(fn (?FaqCategory $record): array => self::publishableStatusOptions($record))
+                            ->disabled(fn (?FaqCategory $record): bool => self::isStatusLocked($record))
+                            ->dehydrated(true)
+                            ->helperText(fn (?FaqCategory $record): ?string => self::statusLockedHint($record))
                             ->required()
-                            ->default(ContentStatus::Published->value),
+                            ->default(fn (): string => self::defaultPublishableStatus(ContentStatus::Published)),
                         TextInput::make('sort_order')
                             ->label(__('admin.cms.field_sort_order'))
                             ->integer()

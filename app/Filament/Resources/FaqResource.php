@@ -8,6 +8,7 @@ use App\Filament\Resources\FaqResource\Pages\EditFaq;
 use App\Filament\Resources\FaqResource\Pages\ListFaqs;
 use App\Models\Faq;
 use App\Models\FaqCategory;
+use App\Support\Filament\Concerns\GuardsContentPublishing;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -32,6 +33,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class FaqResource extends Resource
 {
+    use GuardsContentPublishing;
+
     protected static ?string $model = Faq::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQuestionMarkCircle;
@@ -72,13 +75,12 @@ class FaqResource extends Resource
                             ->columnSpan(2),
                         Select::make('status')
                             ->label(__('admin.cms.field_status'))
-                            ->options([
-                                ContentStatus::Draft->value => __('admin.cms.status_draft'),
-                                ContentStatus::Published->value => __('admin.cms.status_published'),
-                                ContentStatus::Archived->value => __('admin.cms.status_archived'),
-                            ])
+                            ->options(fn (?Faq $record): array => self::publishableStatusOptions($record))
+                            ->disabled(fn (?Faq $record): bool => self::isStatusLocked($record))
+                            ->dehydrated(true)
+                            ->helperText(fn (?Faq $record): ?string => self::statusLockedHint($record))
                             ->required()
-                            ->default(ContentStatus::Published->value),
+                            ->default(fn (): string => self::defaultPublishableStatus(ContentStatus::Published)),
                         TextInput::make('sort_order')
                             ->label(__('admin.cms.field_sort_order'))
                             ->integer()

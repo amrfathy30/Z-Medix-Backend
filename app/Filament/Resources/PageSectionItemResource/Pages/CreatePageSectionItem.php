@@ -11,6 +11,8 @@ class CreatePageSectionItem extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        PageSectionItemResource::assertMayApplyStatus($data);
+
         $data['created_by_admin_id'] = auth('admin')->id();
         $data['updated_by_admin_id'] = auth('admin')->id();
 

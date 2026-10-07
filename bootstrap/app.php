@@ -18,6 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->name('public.')
                 ->group(base_path('routes/api/public.php'));
 
+            Route::middleware(['api', SetPublicLocale::class, 'auth:sanctum'])
+                ->prefix('api/student')
+                ->name('student.')
+                ->group(base_path('routes/api/student.php'));
+
             Route::middleware('api')
                 ->prefix('api/admin')
                 ->name('admin.')

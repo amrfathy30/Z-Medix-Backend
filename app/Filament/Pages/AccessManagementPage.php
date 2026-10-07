@@ -37,9 +37,109 @@ class AccessManagementPage extends Page implements HasTable
 
     protected static ?int $navigationSort = 10;
 
+    private const SUPER_ADMIN_ROLE = 'super_admin';
+
     public ?int $editingRoleId = null;
 
     public ?int $editingAdminId = null;
+
+    /**
+     * The page manages employees and the roles assigned to them, so reaching it
+     * at all requires the admins.view permission. Each action below is gated by
+     * its own permission, so a role that may list employees without creating,
+     * suspending or deleting them sees only what it holds.
+     */
+    public static function canAccess(): bool
+    {
+        return auth('admin')->check() && self::adminCan('admins.view');
+    }
+
+    private static function adminCan(string $permission): bool
+    {
+        return (bool) auth('admin')->user()?->hasPermissionTo($permission);
+    }
+
+    /**
+     * Super admin is never handed out by someone who is not already one, no
+     * matter which admins.* permissions they hold. This is identity, not a
+     * permission: it cannot be granted through a role.
+     */
+    private static function actorIsSuperAdmin(): bool
+    {
+        return auth('admin')->user()?->type === AdminType::SuperAdmin;
+    }
+
+    /**
+     * A super admin account is read-only to anyone who is not a super admin.
+     * Name, status and every other mutable field are covered, not only the
+     * email/type/role the edit form already froze.
+     */
+    private static function isProtectedFromActor(Admin $record): bool
+    {
+        return $record->type === AdminType::SuperAdmin && ! self::actorIsSuperAdmin();
+    }
+
+    /**
+     * Refuses an attempt to modify a super admin account from an actor who is
+     * not one. The record is read from the database, so a crafted payload is
+     * refused on the same terms as a form submission.
+     */
+    private function refusesProtectedAdminChange(Admin $record): bool
+    {
+        if (! self::isProtectedFromActor($record)) {
+            return false;
+        }
+
+        Notification::make()
+            ->title(__('admin.access_management.cannot_modify_super_admin'))
+            ->body(__('admin.access_management.cannot_modify_super_admin_body'))
+            ->danger()
+            ->send();
+
+        return true;
+    }
+
+    /**
+     * Refuses a submitted payload that would make a non-super-admin account a
+     * super admin. The check reads the payload itself rather than the form, so
+     * a crafted request that never saw the filtered options is refused too.
+     *
+     * An account that is already a super admin is not an escalation: the edit
+     * action freezes its type, email and role, so nothing is being granted.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function refusesSuperAdminEscalation(array $data, ?Admin $record = null): bool
+    {
+        if (self::actorIsSuperAdmin() || $record?->type === AdminType::SuperAdmin) {
+            return false;
+        }
+
+        $grantsType = ($data['type'] ?? null) === AdminType::SuperAdmin->value;
+        $grantsRole = ($data['role'] ?? null) === self::SUPER_ADMIN_ROLE;
+
+        if (! $grantsType && ! $grantsRole) {
+            return false;
+        }
+
+        Notification::make()
+            ->title(__('admin.access_management.cannot_grant_super_admin'))
+            ->body(__('admin.access_management.cannot_grant_super_admin_body'))
+            ->danger()
+            ->send();
+
+        return true;
+    }
+
+    /**
+     * The roles section lists every role with the permissions it holds, which is
+     * what roles.view guards. The page itself stays reachable without it, on the
+     * admins.view permission alone.
+     */
+    public function canViewRoles(): bool
+    {
+        return self::adminCan('roles.view');
+    }
 
     public static function getNavigationLabel(): string
     {
@@ -126,20 +226,32 @@ class AccessManagementPage extends Page implements HasTable
             ->toArray();
     }
 
-    private function getRolesOptions(): array
+    /**
+     * @return array<string, string>
+     */
+    private function getRolesOptions(bool $includeSuperAdmin = true): array
     {
         return Role::where('guard_name', 'admin')
             ->get()
+            ->reject(fn (Role $r): bool => $r->name === self::SUPER_ADMIN_ROLE && ! $includeSuperAdmin)
             ->mapWithKeys(fn (Role $r) => [$r->name => $this->getRoleDisplayName($r)])
             ->toArray();
     }
 
-    private function getAdminTypeOptions(): array
+    /**
+     * @return array<string, string>
+     */
+    private function getAdminTypeOptions(bool $includeSuperAdmin = true): array
     {
-        return [
+        $options = [
             AdminType::Admin->value => __('admin.access_management.type_admin'),
-            AdminType::SuperAdmin->value => __('admin.access_management.type_super_admin'),
         ];
+
+        if ($includeSuperAdmin) {
+            $options[AdminType::SuperAdmin->value] = __('admin.access_management.type_super_admin');
+        }
+
+        return $options;
     }
 
     public static function getAdminTablePageOptions(): array
@@ -177,6 +289,7 @@ class AccessManagementPage extends Page implements HasTable
     {
         return Action::make('createRole')
             ->label(__('admin.access_management.create_role'))
+            ->authorize(fn (): bool => self::adminCan('roles.create'))
             ->modalHeading(__('admin.access_management.create_role_heading'))
             ->modalSubmitActionLabel(__('admin.access_management.save'))
             ->schema([
@@ -223,6 +336,7 @@ class AccessManagementPage extends Page implements HasTable
     {
         return Action::make('editRole')
             ->label(__('admin.access_management.edit_role'))
+            ->authorize(fn (): bool => self::adminCan('roles.update'))
             ->color('warning')
             ->button()
             ->outlined()
@@ -280,6 +394,7 @@ class AccessManagementPage extends Page implements HasTable
     {
         return Action::make('deleteRole')
             ->label(__('admin.access_management.delete_role'))
+            ->authorize(fn (): bool => self::adminCan('roles.delete'))
             ->color('danger')
             ->button()
             ->outlined()
@@ -338,6 +453,7 @@ class AccessManagementPage extends Page implements HasTable
     {
         return Action::make('createAdmin')
             ->label(__('admin.access_management.create_admin'))
+            ->authorize(fn (): bool => self::adminCan('admins.create'))
             ->modalHeading(__('admin.access_management.create_admin_heading'))
             ->modalSubmitActionLabel(__('admin.access_management.save'))
             ->schema([
@@ -369,7 +485,7 @@ class AccessManagementPage extends Page implements HasTable
                     ->schema([
                         Select::make('type')
                             ->label(__('admin.access_management.field_type'))
-                            ->options(fn () => $this->getAdminTypeOptions())
+                            ->options(fn () => $this->getAdminTypeOptions(self::actorIsSuperAdmin()))
                             ->default(AdminType::Admin->value)
                             ->required(),
                         Select::make('status')
@@ -380,10 +496,14 @@ class AccessManagementPage extends Page implements HasTable
                     ]),
                 Select::make('role')
                     ->label(__('admin.access_management.field_role'))
-                    ->options(fn () => $this->getRolesOptions())
+                    ->options(fn () => $this->getRolesOptions(self::actorIsSuperAdmin()))
                     ->required(),
             ])
             ->action(function (array $data): void {
+                if ($this->refusesSuperAdminEscalation($data)) {
+                    return;
+                }
+
                 $admin = Admin::create([
                     'name' => $data['name'],
                     'email' => $data['email'],
@@ -450,6 +570,8 @@ class AccessManagementPage extends Page implements HasTable
             ->recordActions([
                 Action::make('editAdmin')
                     ->label(__('admin.access_management.edit_admin'))
+                    ->authorize(fn (Admin $record): bool => self::adminCan('admins.update')
+                        && ! self::isProtectedFromActor($record))
                     ->icon('heroicon-o-pencil')
                     ->color('warning')
                     ->button()
@@ -510,7 +632,9 @@ class AccessManagementPage extends Page implements HasTable
                             ->schema([
                                 Select::make('type')
                                     ->label(__('admin.access_management.field_type'))
-                                    ->options(fn () => $this->getAdminTypeOptions())
+                                    ->options(fn (Get $get) => $this->getAdminTypeOptions(
+                                        self::actorIsSuperAdmin() || (bool) $get('_is_root_admin'),
+                                    ))
                                     ->required()
                                     ->disabled(fn (Get $get): bool => (bool) $get('_is_root_admin'))
                                     ->dehydrated(true),
@@ -521,12 +645,22 @@ class AccessManagementPage extends Page implements HasTable
                             ]),
                         Select::make('role')
                             ->label(__('admin.access_management.field_role'))
-                            ->options(fn () => $this->getRolesOptions())
+                            ->options(fn (Get $get) => $this->getRolesOptions(
+                                self::actorIsSuperAdmin() || (bool) $get('_is_root_admin'),
+                            ))
                             ->required()
                             ->disabled(fn (Get $get): bool => (bool) $get('_is_root_admin'))
                             ->dehydrated(true),
                     ])
                     ->action(function (array $data, Admin $record): void {
+                        if ($this->refusesProtectedAdminChange($record)) {
+                            return;
+                        }
+
+                        if ($this->refusesSuperAdminEscalation($data, $record)) {
+                            return;
+                        }
+
                         // Capture identity from DB before any mutation.
                         $isRootAdmin = $record->type === AdminType::SuperAdmin;
 
@@ -561,6 +695,8 @@ class AccessManagementPage extends Page implements HasTable
                     ->label(fn (Admin $record): string => $record->status === AccountStatus::Active
                         ? __('admin.access_management.suspend_admin')
                         : __('admin.access_management.activate_admin'))
+                    ->authorize(fn (Admin $record): bool => self::adminCan('admins.update')
+                        && ! self::isProtectedFromActor($record))
                     ->icon(fn (Admin $record): string => $record->status === AccountStatus::Active
                         ? 'heroicon-o-no-symbol'
                         : 'heroicon-o-check-circle')
@@ -579,6 +715,10 @@ class AccessManagementPage extends Page implements HasTable
                         : __('admin.access_management.activate_admin_confirm'))
                     ->hidden(fn (Admin $record): bool => $record->id === auth('admin')->id())
                     ->action(function (Admin $record): void {
+                        if ($this->refusesProtectedAdminChange($record)) {
+                            return;
+                        }
+
                         if ($record->id === auth('admin')->id()) {
                             Notification::make()
                                 ->title(__('admin.access_management.cannot_self_suspend'))
@@ -606,6 +746,8 @@ class AccessManagementPage extends Page implements HasTable
 
                 Action::make('deleteAdmin')
                     ->label(__('admin.access_management.delete_admin'))
+                    ->authorize(fn (Admin $record): bool => self::adminCan('admins.delete')
+                        && ! self::isProtectedFromActor($record))
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()

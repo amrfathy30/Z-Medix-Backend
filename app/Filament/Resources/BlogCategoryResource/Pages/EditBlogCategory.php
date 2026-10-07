@@ -20,4 +20,11 @@ class EditBlogCategory extends EditRecord
             RestoreAction::make(),
         ];
     }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        BlogCategoryResource::assertMayApplyStatus($data, $this->record);
+
+        return $data;
+    }
 }
