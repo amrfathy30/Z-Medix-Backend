@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ContentStatus;
 use App\Services\Media\MediaUploadService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -41,6 +42,31 @@ class Subject extends Model implements HasMedia
         return $this->hasMany(Chapter::class)
             ->orderBy('order')
             ->orderBy('id');
+    }
+
+    /**
+     * The chapters a student may study: drafts and archived chapters are not
+     * study content, so they never take part in the chapter sequence.
+     */
+    public function publishedChapters(): HasMany
+    {
+        return $this->chapters()->where('status', ContentStatus::Published);
+    }
+
+    /**
+     * Only published subjects are study content.
+     *
+     * @param  Builder<Subject>  $query
+     * @return Builder<Subject>
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where('status', ContentStatus::Published);
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->status === ContentStatus::Published;
     }
 
     /**

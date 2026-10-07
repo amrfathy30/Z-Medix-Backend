@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ContentStatus;
 use App\Models\Concerns\HasSequentialOrder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -80,6 +81,30 @@ class Chapter extends Model
     public function trashedQuiz(): ?Quiz
     {
         return $this->quiz()->onlyTrashed()->first();
+    }
+
+    /**
+     * Completion records of this chapter, one per student who finished it.
+     */
+    public function studentProgress(): HasMany
+    {
+        return $this->hasMany(StudentChapterProgress::class);
+    }
+
+    /**
+     * Only published chapters are study content.
+     *
+     * @param  Builder<Chapter>  $query
+     * @return Builder<Chapter>
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where('status', ContentStatus::Published);
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->status === ContentStatus::Published;
     }
 
     public function quizQuestionCount(): int
