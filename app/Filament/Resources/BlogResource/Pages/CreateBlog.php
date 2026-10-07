@@ -11,6 +11,8 @@ class CreateBlog extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        BlogResource::assertMayApplyStatus($data);
+
         $data['created_by_admin_id'] = auth('admin')->id();
         $data['updated_by_admin_id'] = auth('admin')->id();
 

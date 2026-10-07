@@ -20,4 +20,11 @@ class EditFaqCategory extends EditRecord
             RestoreAction::make(),
         ];
     }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        FaqCategoryResource::assertMayApplyStatus($data, $this->record);
+
+        return $data;
+    }
 }

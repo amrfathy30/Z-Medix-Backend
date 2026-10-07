@@ -8,6 +8,7 @@ use App\Filament\Resources\PageSectionItemResource\Pages\EditPageSectionItem;
 use App\Filament\Resources\PageSectionItemResource\Pages\ListPageSectionItems;
 use App\Models\PageSection;
 use App\Models\PageSectionItem;
+use App\Support\Filament\Concerns\GuardsContentPublishing;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -34,6 +35,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PageSectionItemResource extends Resource
 {
+    use GuardsContentPublishing;
+
     protected static ?string $model = PageSectionItem::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
@@ -82,12 +85,12 @@ class PageSectionItemResource extends Resource
                     ->required()->searchable()->columnSpan(2),
                 Select::make('status')
                     ->label(__('admin.cms.field_status'))
-                    ->options([
-                        ContentStatus::Draft->value => __('admin.cms.status_draft'),
-                        ContentStatus::Published->value => __('admin.cms.status_published'),
-                        ContentStatus::Archived->value => __('admin.cms.status_archived'),
-                    ])
-                    ->required()->default(ContentStatus::Published->value),
+                    ->options(fn (?PageSectionItem $record): array => self::publishableStatusOptions($record))
+                    ->disabled(fn (?PageSectionItem $record): bool => self::isStatusLocked($record))
+                    ->dehydrated(true)
+                    ->helperText(fn (?PageSectionItem $record): ?string => self::statusLockedHint($record))
+                    ->required()
+                    ->default(fn (): string => self::defaultPublishableStatus(ContentStatus::Published)),
                 TextInput::make('sort_order')->label(__('admin.cms.field_sort_order'))->integer()->default(0),
                 TextInput::make('icon')->label(__('admin.cms.field_icon'))->maxLength(100),
                 TextInput::make('link')->label(__('admin.cms.field_link'))->url()->maxLength(255),

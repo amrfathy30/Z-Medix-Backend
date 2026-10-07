@@ -18,10 +18,13 @@ class EditBlog extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            // Moving content in and out of publication is its own permission,
+            // held separately from content.update.
             Action::make('publish')
                 ->label(__('admin.cms.action_publish'))
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
+                ->authorize(fn (): bool => $this->canPublishContent())
                 ->visible(fn (): bool => $this->record->status !== ContentStatus::Published)
                 ->requiresConfirmation()
                 ->action(function (): void {
@@ -38,6 +41,7 @@ class EditBlog extends EditRecord
                 ->label(__('admin.cms.action_archive'))
                 ->icon('heroicon-o-archive-box')
                 ->color('warning')
+                ->authorize(fn (): bool => $this->canPublishContent())
                 ->visible(fn (): bool => $this->record->status === ContentStatus::Published)
                 ->requiresConfirmation()
                 ->action(function (): void {
@@ -55,8 +59,15 @@ class EditBlog extends EditRecord
         ];
     }
 
+    private function canPublishContent(): bool
+    {
+        return (bool) auth('admin')->user()?->hasPermissionTo('content.publish');
+    }
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        BlogResource::assertMayApplyStatus($data, $this->record);
+
         $data['updated_by_admin_id'] = auth('admin')->id();
 
         return $data;
