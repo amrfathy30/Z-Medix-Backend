@@ -3,6 +3,13 @@
 use App\Http\Controllers\Api\Student\ChapterController;
 use App\Http\Controllers\Api\Student\ChapterPageController;
 use App\Http\Controllers\Api\Student\ChapterQuizController;
+use App\Http\Controllers\Api\Student\FellowshipAnswerController;
+use App\Http\Controllers\Api\Student\FellowshipAvailabilityController;
+use App\Http\Controllers\Api\Student\FellowshipController;
+use App\Http\Controllers\Api\Student\FellowshipFilterController;
+use App\Http\Controllers\Api\Student\FellowshipSessionController;
+use App\Http\Controllers\Api\Student\FellowshipSessionResultController;
+use App\Http\Controllers\Api\Student\FellowshipSessionStateController;
 use App\Http\Controllers\Api\Student\HighlightController;
 use App\Http\Controllers\Api\Student\NoteController;
 use App\Http\Controllers\Api\Student\QuizAnswerController;
@@ -51,4 +58,38 @@ Route::prefix('study')->name('study.')->group(function (): void {
     // answerable after the live question it was captured from is deleted.
     Route::post('quiz-attempts/{quizAttempt}/questions/{quizAttemptQuestion}/answer', QuizAnswerController::class)
         ->name('quiz-attempts.questions.answer');
+});
+
+// The Fellowship question banks. A separate tree from the study flow above:
+// a Fellowship has no chapters and no reading pages, and its sessions never mix
+// with chapter quiz attempts.
+//
+// Sessions are addressed by their own id rather than nested under the
+// Fellowship, since a session stays answerable on its own terms, and questions
+// are addressed by their session row rather than by the live question — so a
+// session survives the question behind it being edited or deleted.
+Route::prefix('fellowships')->name('fellowships.')->group(function (): void {
+    // The Question Bank screen lists Fellowships, not questions.
+    Route::get('/', [FellowshipController::class, 'index'])->name('index');
+    Route::get('{fellowship}', [FellowshipController::class, 'show'])->name('show');
+
+    // What the Generate Session form offers, and what a given set of filters
+    // would actually yield.
+    Route::get('{fellowship}/filters', FellowshipFilterController::class)->name('filters');
+    Route::post('{fellowship}/available-questions', FellowshipAvailabilityController::class)->name('available-questions');
+
+    Route::get('{fellowship}/sessions', [FellowshipSessionController::class, 'index'])->name('sessions.index');
+    Route::post('{fellowship}/sessions', [FellowshipSessionController::class, 'store'])->name('sessions.store');
+});
+
+Route::prefix('fellowship-sessions')->name('fellowship-sessions.')->group(function (): void {
+    Route::get('{fellowshipQuizSession}', [FellowshipSessionController::class, 'show'])->name('show');
+    Route::get('{fellowshipQuizSession}/result', FellowshipSessionResultController::class)->name('result');
+
+    // The only two things that stop and start a session's clock.
+    Route::post('{fellowshipQuizSession}/pause', [FellowshipSessionStateController::class, 'pause'])->name('pause');
+    Route::post('{fellowshipQuizSession}/resume', [FellowshipSessionStateController::class, 'resume'])->name('resume');
+
+    Route::post('{fellowshipQuizSession}/questions/{fellowshipSessionQuestion}/answer', FellowshipAnswerController::class)
+        ->name('questions.answer');
 });

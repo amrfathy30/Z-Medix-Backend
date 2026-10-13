@@ -160,4 +160,17 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             ->orderByDesc('created_at')
             ->orderByDesc('id');
     }
+
+    /**
+     * The student's Fellowship quiz sessions, newest first. Separate from
+     * `quizAttempts`, which belongs to chapter quizzes: a student may hold
+     * several open Fellowship sessions at once, each over its own generated set
+     * of questions.
+     */
+    public function fellowshipQuizSessions(): HasMany
+    {
+        return $this->hasMany(FellowshipQuizSession::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
 }
