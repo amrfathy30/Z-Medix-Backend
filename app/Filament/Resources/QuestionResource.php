@@ -46,6 +46,7 @@ class QuestionResource extends Resource
             ->components([
                 Section::make(__('admin.learning.question_section_details'))
                     ->schema([
+                        self::titleField()->columnSpanFull(),
                         self::questionField()->columnSpanFull(),
                     ]),
 
@@ -54,6 +55,19 @@ class QuestionResource extends Resource
                         self::optionsRepeater(),
                     ]),
             ]);
+    }
+
+    /**
+     * A short heading for the question, shown beside it in the student's
+     * question list. Optional, and never a replacement for the question text:
+     * every question written before this field has none.
+     */
+    public static function titleField(): TextInput
+    {
+        return TextInput::make('title')
+            ->label(__('admin.learning.field_question_title'))
+            ->helperText(__('admin.learning.question_title_hint'))
+            ->maxLength(255);
     }
 
     public static function questionField(): Textarea
@@ -67,6 +81,10 @@ class QuestionResource extends Resource
 
     /**
      * Answer options: at least two, exactly one marked correct, order preserved.
+     *
+     * Each option carries its own explanation beside its text and its correct
+     * flag — why that answer is the right one, or why it is not. It is optional
+     * per option and separate from the question's own explanation.
      */
     public static function optionsRepeater(): Repeater
     {
@@ -88,6 +106,12 @@ class QuestionResource extends Resource
                     ->label(__('admin.learning.field_option_is_correct'))
                     ->inline(false)
                     ->default(false),
+                Textarea::make('explanation')
+                    ->label(__('admin.learning.field_option_explanation'))
+                    ->helperText(__('admin.learning.option_explanation_hint'))
+                    ->rows(2)
+                    ->maxLength(2000)
+                    ->columnSpanFull(),
             ])
             ->columns(3)
             ->rule(static function (): Closure {

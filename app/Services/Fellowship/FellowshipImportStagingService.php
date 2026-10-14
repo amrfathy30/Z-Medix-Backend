@@ -207,6 +207,23 @@ class FellowshipImportStagingService
             $options[] = (string) ($cell($header) ?? '');
         }
 
+        // Keyed by the option it explains, so a position with no explanation
+        // column is absent rather than null — which is the difference between
+        // an update clearing an explanation and leaving it alone.
+        $optionExplanations = [];
+
+        foreach ($map->optionExplanationHeaders() as $slot => $header) {
+            $index = $slot - 1;
+
+            // A column explaining an option this import never mapped has no
+            // option to attach to, so it is read as nothing at all.
+            if (! array_key_exists($index, $options)) {
+                continue;
+            }
+
+            $optionExplanations[$index] = $cell($header);
+        }
+
         $filters = [];
 
         foreach ($map->dynamicFilterColumns() as $column) {
@@ -232,6 +249,8 @@ class FellowshipImportStagingService
             options: $options,
             filters: $filters,
             raw: $raw,
+            title: $cell($map->headerFor(FellowshipImportMappingTarget::Title)),
+            optionExplanations: $optionExplanations,
         );
     }
 

@@ -48,6 +48,10 @@ class ViewQuestion extends ViewRecord
                 Section::make(__('admin.learning.question_section_overview'))
                     ->key('question-overview')
                     ->schema([
+                        TextEntry::make('title')
+                            ->label(__('admin.learning.field_question_title'))
+                            ->placeholder('—')
+                            ->columnSpanFull(),
                         TextEntry::make('question')
                             ->label(__('admin.learning.field_question_text'))
                             ->columnSpanFull(),
@@ -90,6 +94,10 @@ class ViewQuestion extends ViewRecord
                                     ->tooltip(fn (QuestionOption $record): ?string => $record->is_correct
                                         ? __('admin.learning.field_correct_answer')
                                         : null),
+                                TextEntry::make('explanation')
+                                    ->label(__('admin.learning.field_option_explanation'))
+                                    ->placeholder('—')
+                                    ->columnSpanFull(),
                             ])
                             ->columns(3),
                     ]),

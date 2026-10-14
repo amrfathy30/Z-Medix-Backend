@@ -28,6 +28,7 @@ class FellowshipQuestion extends Model
 
     protected $fillable = [
         'fellowship_id',
+        'title',
         'question_text',
         'explanation',
         'difficulty',

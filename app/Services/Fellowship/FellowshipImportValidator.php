@@ -21,6 +21,9 @@ use App\Support\Fellowship\QuestionTextNormalizer;
  */
 class FellowshipImportValidator
 {
+    /** Matches the `title` column on `fellowship_questions`. */
+    public const TITLE_MAX_LENGTH = 255;
+
     /**
      * Problems with this row, as messages the admin can act on. An empty array
      * means the row is importable.
@@ -61,7 +64,39 @@ class FellowshipImportValidator
             $errors[] = 'Performance topic is empty.';
         }
 
-        return [...$errors, ...$this->filterValueLengthErrors($payload, $map)];
+        return [
+            ...$errors,
+            ...$this->titleLengthErrors($payload, $map),
+            ...$this->filterValueLengthErrors($payload, $map),
+        ];
+    }
+
+    /**
+     * A title cell longer than the column can hold.
+     *
+     * Checked here for the same reason the filter values are: `title` is a
+     * `varchar(255)`, so an over-long cell would pass staging and be refused by
+     * MySQL at confirmation, turning a problem that was visible in the file into
+     * a row the admin is only told about at the end. The title is optional and
+     * carries nothing else, so a long one excludes its own row and nothing more.
+     *
+     * Counted in characters, because the column is `utf8mb4` and MySQL counts
+     * characters there.
+     *
+     * @return list<string>
+     */
+    private function titleLengthErrors(ImportRowPayload $payload, ImportHeaderMap $map): array
+    {
+        if ($payload->title === null || mb_strlen(trim($payload->title)) <= self::TITLE_MAX_LENGTH) {
+            return [];
+        }
+
+        return [__('admin.fellowship.import_error_title_too_long', [
+            'column' => $map->headerFor(FellowshipImportMappingTarget::Title)
+                ?? __('admin.fellowship.target_title'),
+            'length' => mb_strlen(trim($payload->title)),
+            'max' => self::TITLE_MAX_LENGTH,
+        ])];
     }
 
     /**

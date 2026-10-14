@@ -49,6 +49,7 @@ class ChapterResource extends Resource
                 Section::make(__('admin.learning.chapter_section_details'))
                     ->schema([
                         self::titleField()->columnSpanFull(),
+                        self::referencesField()->columnSpanFull(),
                         self::statusField(),
                     ])
                     ->columns(2),
@@ -60,6 +61,19 @@ class ChapterResource extends Resource
         return TextInput::make('title')
             ->label(__('admin.learning.field_chapter_title'))
             ->required()
+            ->maxLength(255);
+    }
+
+    /**
+     * Where the chapter's educational content was taken from — one line, as the
+     * admin types it. Optional: a chapter that records no source is normal, and
+     * every chapter that predates the field has none.
+     */
+    public static function referencesField(): TextInput
+    {
+        return TextInput::make('references')
+            ->label(__('admin.learning.field_chapter_references'))
+            ->helperText(__('admin.learning.chapter_references_hint'))
             ->maxLength(255);
     }
 
