@@ -7,6 +7,7 @@ use App\Enums\ContentStatus;
 use App\Exceptions\Learning\BookTypeLockedException;
 use App\Models\Concerns\HasSequentialOrder;
 use App\Services\Media\MediaUploadService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -149,5 +150,23 @@ class Book extends Model implements HasMedia
     public function hasContent(): bool
     {
         return $this->hasPdf() || $this->pagesCount() > 0;
+    }
+
+    /**
+     * Only published books are student-facing content. Mirrors
+     * {@see Chapter::scopePublished()} so both kinds of subject content answer
+     * the question the same way.
+     *
+     * @param  Builder<Book>  $query
+     * @return Builder<Book>
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where('status', ContentStatus::Published);
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->status === ContentStatus::Published;
     }
 }

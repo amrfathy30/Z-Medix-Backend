@@ -173,4 +173,25 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             ->orderByDesc('created_at')
             ->orderByDesc('id');
     }
+
+    /**
+     * Passages the student bookmarked while reading, newest first.
+     */
+    public function bookmarks(): HasMany
+    {
+        return $this->hasMany(StudentBookmark::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * PDFs the student uploaded to their own library, newest first. Nothing to
+     * do with {@see Book}, which is admin-authored platform content.
+     */
+    public function privateBooks(): HasMany
+    {
+        return $this->hasMany(StudentPrivateBook::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
 }

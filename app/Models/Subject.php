@@ -81,6 +81,16 @@ class Subject extends Model implements HasMedia
     }
 
     /**
+     * The platform books a student may read: drafts and archived books are not
+     * student-facing content. The counterpart of
+     * {@see self::publishedChapters()} for the subject's other content type.
+     */
+    public function publishedBooks(): HasMany
+    {
+        return $this->books()->where('status', ContentStatus::Published);
+    }
+
+    /**
      * Resolved public URL of the subject image, or null when none is uploaded.
      */
     public function imageUrl(): ?string

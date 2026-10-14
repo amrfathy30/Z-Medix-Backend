@@ -18,7 +18,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class QuizAttemptResource extends JsonResource
 {
     /**
-     * @param  array{total_questions: int, answered_questions: int, correct_answers: int, incorrect_answers: int}  $tally
+     * @param  array{total_questions: int, answered_questions: int, correct_answers: int, incorrect_answers: int, score: int, percentage: float, average_score: float|null}  $tally
      */
     public function __construct($resource, private array $tally)
     {
