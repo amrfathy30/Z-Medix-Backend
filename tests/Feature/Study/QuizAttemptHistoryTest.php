@@ -40,6 +40,7 @@ class QuizAttemptHistoryTest extends StudyTestCase
         $liveOptions = $row->question->options->map(fn ($option) => [
             'key' => (string) $option->id,
             'option_text' => $option->option_text,
+            'explanation' => $option->explanation,
             'is_correct' => (bool) $option->is_correct,
             'order' => (int) $option->order,
         ])->all();

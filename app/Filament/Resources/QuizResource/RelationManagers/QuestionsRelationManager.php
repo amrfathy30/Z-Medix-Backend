@@ -47,6 +47,7 @@ class QuestionsRelationManager extends RelationManager
     {
         return $schema
             ->components([
+                QuestionResource::titleField()->columnSpanFull(),
                 QuestionResource::questionField()->columnSpanFull(),
                 QuestionResource::optionsRepeater(),
             ]);
@@ -62,6 +63,11 @@ class QuestionsRelationManager extends RelationManager
                     ->badge()
                     ->color('gray')
                     ->tooltip(__('admin.learning.reorder_hint')),
+                TextColumn::make('title')
+                    ->label(__('admin.learning.field_question_title'))
+                    ->placeholder('—')
+                    ->searchable()
+                    ->limit(40),
                 TextColumn::make('question')
                     ->label(__('admin.learning.field_question_text'))
                     ->searchable()

@@ -57,6 +57,9 @@ class ViewChapter extends ViewRecord
                     ->schema([
                         TextEntry::make('title')
                             ->label(__('admin.learning.field_chapter_title')),
+                        TextEntry::make('references')
+                            ->label(__('admin.learning.field_chapter_references'))
+                            ->placeholder('—'),
                         TextEntry::make('subject.name')
                             ->label(__('admin.learning.field_subject'))
                             ->url(fn (Chapter $record): string => SubjectResource::getUrl('view', ['record' => $record->subject_id])),

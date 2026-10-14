@@ -13,7 +13,9 @@ namespace App\Enums;
 enum FellowshipImportMappingTarget: string
 {
     case QuestionText = 'question_text';
+    case Title = 'title';
     case Explanation = 'explanation';
+    case AnswerOptionExplanation = 'answer_option_explanation';
     case Difficulty = 'difficulty';
     case CorrectAnswer = 'correct_answer';
     case AnswerOption = 'answer_option';
@@ -45,8 +47,9 @@ enum FellowshipImportMappingTarget: string
      * The single-value system fields, in the order the mapping step presents
      * them: the required ones first, then the optional.
      *
-     * Answer options are deliberately absent — they are the one repeatable
-     * system field and the mapping step gives them their own numbered slots.
+     * Answer options are deliberately absent — they and their per-option
+     * explanations are the repeatable system fields, and the mapping step gives
+     * each of them their own numbered slots.
      *
      * @return list<self>
      */
@@ -57,6 +60,7 @@ enum FellowshipImportMappingTarget: string
             self::CorrectAnswer,
             self::Difficulty,
             self::PerformanceTopic,
+            self::Title,
             self::Explanation,
         ];
     }
@@ -75,7 +79,8 @@ enum FellowshipImportMappingTarget: string
     public function isRepeatable(): bool
     {
         return match ($this) {
-            self::AnswerOption, self::ExistingFilter, self::NewFilter, self::Ignore => true,
+            self::AnswerOption, self::AnswerOptionExplanation,
+            self::ExistingFilter, self::NewFilter, self::Ignore => true,
             default => false,
         };
     }

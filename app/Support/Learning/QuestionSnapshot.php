@@ -21,8 +21,8 @@ use App\Models\Question;
  * array, so the schema can grow (an explanation, media, a question type) without
  * every reader having to know about it.
  *
- * @phpstan-type SnapshotOption array{key: string, option_text: string, is_correct: bool, order: int}
- * @phpstan-type SnapshotArray array{version: int, question_id: int|null, question: string, explanation: string|null, options: list<SnapshotOption>}
+ * @phpstan-type SnapshotOption array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}
+ * @phpstan-type SnapshotArray array{version: int, question_id: int|null, title: string|null, question: string, explanation: string|null, options: list<SnapshotOption>}
  */
 final readonly class QuestionSnapshot
 {
@@ -30,13 +30,14 @@ final readonly class QuestionSnapshot
      * Stored with every snapshot so a later shape change can be read back
      * without guessing which documents predate it.
      */
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /**
-     * @param  list<array{key: string, option_text: string, is_correct: bool, order: int}>  $options
+     * @param  list<array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}>  $options
      */
     private function __construct(
         public ?int $questionId,
+        public ?string $title,
         public string $question,
         public ?string $explanation,
         public array $options,
@@ -55,6 +56,7 @@ final readonly class QuestionSnapshot
             ->map(fn ($option): array => [
                 'key' => (string) $option->getKey(),
                 'option_text' => (string) $option->option_text,
+                'explanation' => self::nullableText($option->explanation),
                 'is_correct' => (bool) $option->is_correct,
                 'order' => (int) $option->order,
             ])
@@ -63,6 +65,7 @@ final readonly class QuestionSnapshot
 
         return new self(
             questionId: $question->getKey(),
+            title: self::nullableText($question->title),
             question: (string) $question->question,
             // `questions` carries no explanation column today. The key is
             // captured regardless so snapshots taken before one is added stay
@@ -77,11 +80,14 @@ final readonly class QuestionSnapshot
      */
     public static function fromArray(array $snapshot): self
     {
-        /** @var list<array{key: string, option_text: string, is_correct: bool, order: int}> $options */
+        /** @var list<array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}> $options */
         $options = array_values(array_map(
             fn (array $option): array => [
                 'key' => (string) ($option['key'] ?? ''),
                 'option_text' => (string) ($option['option_text'] ?? ''),
+                // Absent in every snapshot taken before per-option
+                // explanations existed, which reads as "none".
+                'explanation' => self::nullableText($option['explanation'] ?? null),
                 'is_correct' => (bool) ($option['is_correct'] ?? false),
                 'order' => (int) ($option['order'] ?? 0),
             ],
@@ -90,6 +96,7 @@ final readonly class QuestionSnapshot
 
         return new self(
             questionId: isset($snapshot['question_id']) ? (int) $snapshot['question_id'] : null,
+            title: self::nullableText($snapshot['title'] ?? null),
             question: (string) ($snapshot['question'] ?? ''),
             explanation: isset($snapshot['explanation']) ? (string) $snapshot['explanation'] : null,
             options: $options,
@@ -105,6 +112,7 @@ final readonly class QuestionSnapshot
         return [
             'version' => $this->version,
             'question_id' => $this->questionId,
+            'title' => $this->title,
             'question' => $this->question,
             'explanation' => $this->explanation,
             'options' => $this->options,
@@ -113,24 +121,59 @@ final readonly class QuestionSnapshot
 
     /**
      * The options as the student is shown them: text only, in the order the
-     * admin had set when the attempt was created. Correctness is deliberately
-     * absent, so this can be returned for an unanswered question.
+     * admin had set when the attempt was created. Correctness and the
+     * per-option explanations are deliberately absent, so this can be returned
+     * for an unanswered question.
      *
      * @return list<array{key: string, option_text: string}>
      */
     public function presentableOptions(): array
     {
-        $options = $this->options;
-
-        usort($options, fn (array $a, array $b): int => [$a['order'], $a['key']] <=> [$b['order'], $b['key']]);
-
         return array_values(array_map(
             fn (array $option): array => [
                 'key' => $option['key'],
                 'option_text' => $option['option_text'],
             ],
-            $options,
+            $this->orderedOptions(),
         ));
+    }
+
+    /**
+     * The options with everything the question itself gives away: which one is
+     * correct, and why each one is right or wrong.
+     *
+     * Only ever for a question the student has already answered — the caller
+     * decides that, and {@see presentableOptions()} is what an unanswered
+     * question gets.
+     *
+     * @return list<array{key: string, option_text: string, explanation: string|null, is_correct: bool}>
+     */
+    public function revealedOptions(): array
+    {
+        return array_values(array_map(
+            fn (array $option): array => [
+                'key' => $option['key'],
+                'option_text' => $option['option_text'],
+                'explanation' => $option['explanation'],
+                'is_correct' => $option['is_correct'],
+            ],
+            $this->orderedOptions(),
+        ));
+    }
+
+    /**
+     * The captured options in the order the admin had set them, which is the
+     * order the student was shown and the order the sidebar must keep.
+     *
+     * @return list<array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}>
+     */
+    private function orderedOptions(): array
+    {
+        $options = $this->options;
+
+        usort($options, fn (array $a, array $b): int => [$a['order'], $a['key']] <=> [$b['order'], $b['key']]);
+
+        return array_values($options);
     }
 
     public function hasOption(string $key): bool
@@ -139,7 +182,7 @@ final readonly class QuestionSnapshot
     }
 
     /**
-     * @return array{key: string, option_text: string, is_correct: bool, order: int}|null
+     * @return array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}|null
      */
     public function option(string $key): ?array
     {
@@ -181,6 +224,18 @@ final readonly class QuestionSnapshot
     }
 
     /**
+     * The explanation of one captured option, or null when it has none.
+     */
+    public function optionExplanation(?string $key): ?string
+    {
+        if ($key === null) {
+            return null;
+        }
+
+        return $this->option($key)['explanation'] ?? null;
+    }
+
+    /**
      * Reads an explanation off the question only if the model actually carries
      * one, so this keeps working unchanged when the column is introduced.
      */
@@ -189,5 +244,18 @@ final readonly class QuestionSnapshot
         $explanation = $question->getAttribute('explanation');
 
         return is_string($explanation) && $explanation !== '' ? $explanation : null;
+    }
+
+    /**
+     * Empty is stored as absent, so a cleared field and one never filled in
+     * read back the same way.
+     */
+    private static function nullableText(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        return $value === '' ? null : $value;
     }
 }

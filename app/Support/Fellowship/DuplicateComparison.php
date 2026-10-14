@@ -51,6 +51,15 @@ final readonly class DuplicateComparison
                 inImport: true,
             ),
             self::field(
+                'Title',
+                $existing?->title,
+                $payload->title,
+                // Absent from the file means an update preserves the stored
+                // title, so it is shown as not in the import rather than as a
+                // blank that would overwrite.
+                inImport: $map->has(FellowshipImportMappingTarget::Title),
+            ),
+            self::field(
                 'Explanation',
                 $existing?->explanation,
                 $payload->explanation,

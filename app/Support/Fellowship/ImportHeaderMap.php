@@ -22,7 +22,7 @@ use App\Exceptions\Fellowship\FellowshipImportException;
  * `isComplete()` is what gates the Confirm button: a missing required mapping
  * blocks the import rather than importing something half-understood.
  *
- * @phpstan-type Entry array{target: string, filter_id?: int|null, filter_name?: string|null}
+ * @phpstan-type Entry array{target: string, filter_id?: int|null, filter_name?: string|null, option_slot?: int|null}
  */
 final readonly class ImportHeaderMap
 {
@@ -30,7 +30,7 @@ final readonly class ImportHeaderMap
     public const MINIMUM_OPTION_COLUMNS = 2;
 
     /**
-     * @param  array<string, array{target: string, filter_id?: int|null, filter_name?: string|null}>  $entries  Keyed by header, in the file's own column order.
+     * @param  array<string, array{target: string, filter_id?: int|null, filter_name?: string|null, option_slot?: int|null}>  $entries  Keyed by header, in the file's own column order.
      */
     private function __construct(public array $entries) {}
 
@@ -63,6 +63,12 @@ final readonly class ImportHeaderMap
                 'filter_name' => isset($entry['filter_name']) && trim((string) $entry['filter_name']) !== ''
                     ? trim((string) $entry['filter_name'])
                     : null,
+                // Which answer option an explanation column belongs to, 1-based
+                // among the option columns this import mapped. Only
+                // answer-option-explanation entries carry one.
+                'option_slot' => isset($entry['option_slot']) && (int) $entry['option_slot'] >= 1
+                    ? (int) $entry['option_slot']
+                    : null,
             ];
         }
 
@@ -70,7 +76,7 @@ final readonly class ImportHeaderMap
     }
 
     /**
-     * @return array<string, array{target: string, filter_id?: int|null, filter_name?: string|null}>
+     * @return array<string, array{target: string, filter_id?: int|null, filter_name?: string|null, option_slot?: int|null}>
      */
     public function toArray(): array
     {
@@ -104,6 +110,57 @@ final readonly class ImportHeaderMap
     public function has(FellowshipImportMappingTarget $target): bool
     {
         return $this->headersFor($target) !== [];
+    }
+
+    /**
+     * The explanation column of each answer option, keyed by that option's
+     * 1-based position among the option columns this import mapped.
+     *
+     * The position is stored with the entry rather than inferred from order,
+     * because an admin who explains options 1 and 3 and leaves 2 blank would
+     * otherwise have the third option's explanation read as the second's.
+     *
+     * Maps written before explanations existed carry no slot at all; those fall
+     * back to the order the columns were mapped in, which is what a map
+     * produced by the wizard before this field would have meant.
+     *
+     * @return array<int, string>
+     */
+    public function optionExplanationHeaders(): array
+    {
+        $headers = [];
+        $nextFallbackSlot = 1;
+
+        foreach ($this->entries as $header => $entry) {
+            if ($entry['target'] !== FellowshipImportMappingTarget::AnswerOptionExplanation->value) {
+                continue;
+            }
+
+            $slot = $entry['option_slot'] ?? null;
+
+            if ($slot === null) {
+                // Take the next free fallback slot, so two unslotted entries
+                // cannot collide on the same option.
+                while (isset($headers[$nextFallbackSlot])) {
+                    $nextFallbackSlot++;
+                }
+
+                $slot = $nextFallbackSlot;
+            }
+
+            // A slot already taken keeps its first claim: the map is header-keyed
+            // and two columns explaining one option is not something to resolve
+            // by overwriting.
+            if (isset($headers[$slot])) {
+                continue;
+            }
+
+            $headers[$slot] = (string) $header;
+        }
+
+        ksort($headers);
+
+        return $headers;
     }
 
     /**

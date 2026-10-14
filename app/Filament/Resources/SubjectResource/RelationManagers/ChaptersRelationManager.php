@@ -73,6 +73,7 @@ class ChaptersRelationManager extends RelationManager
                                 }
                             })
                             ->columnSpanFull(),
+                        ChapterResource::referencesField()->columnSpanFull(),
                     ]),
 
                 Section::make(__('admin.learning.quiz_section'))
@@ -146,7 +147,10 @@ class ChaptersRelationManager extends RelationManager
 
                         return $chapters->createWithQuiz(
                             $subject,
-                            ['title' => $data['title'] ?? null],
+                            [
+                                'title' => $data['title'] ?? null,
+                                'references' => $data['references'] ?? null,
+                            ],
                             $data['quiz'] ?? [],
                         );
                     }),

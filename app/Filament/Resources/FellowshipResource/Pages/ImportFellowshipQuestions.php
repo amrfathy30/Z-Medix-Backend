@@ -277,6 +277,11 @@ class ImportFellowshipQuestions extends Page
      * The numbered answer-option slots: the first two required, the rest there
      * for a file that carries more.
      *
+     * Each slot is followed by the column explaining that option, so the two
+     * sit side by side on one row of the grid and an admin cannot lose track of
+     * which explanation belongs to which answer. The explanation is always
+     * optional: a file that carries none imports exactly as it did before.
+     *
      * @return list<Select>
      */
     private function answerOptionSelects(): array
@@ -288,6 +293,12 @@ class ImportFellowshipQuestions extends Page
                 key: $this->optionKey($slot),
                 label: __('admin.fellowship.field_import_answer_option_number', ['number' => $slot]),
                 required: $slot <= ImportHeaderMap::MINIMUM_OPTION_COLUMNS,
+            );
+
+            $selects[] = $this->headerSelect(
+                key: $this->optionExplanationKey($slot),
+                label: __('admin.fellowship.field_import_answer_option_explanation_number', ['number' => $slot]),
+                required: false,
             );
         }
 
@@ -1170,6 +1181,11 @@ class ImportFellowshipQuestions extends Page
         return 'option_'.$slot;
     }
 
+    private function optionExplanationKey(int $slot): string
+    {
+        return 'option_explanation_'.$slot;
+    }
+
     /**
      * Rebuild the mapping schema against the columns that are now known.
      *
@@ -1217,11 +1233,15 @@ class ImportFellowshipQuestions extends Page
         /** @var array<string, string> $claimedBy header => the field key that claimed it */
         $claimedBy = [];
 
-        $claim = function (string $key, FellowshipImportMappingTarget $target) use ($system, &$entries, &$claimedBy): void {
+        $claim = function (
+            string $key,
+            FellowshipImportMappingTarget $target,
+            ?int $optionSlot = null,
+        ) use ($system, &$entries, &$claimedBy): bool {
             $header = $system[$key] ?? null;
 
             if (! is_string($header) || $header === '') {
-                return;
+                return false;
             }
 
             if (isset($claimedBy[$header])) {
@@ -1239,15 +1259,42 @@ class ImportFellowshipQuestions extends Page
                 'target' => $target->value,
                 'filter_id' => null,
                 'filter_name' => null,
+                'option_slot' => $optionSlot,
             ];
+
+            return true;
         };
 
         foreach (FellowshipImportMappingTarget::systemFields() as $target) {
             $claim($target->value, $target);
         }
 
+        // An explanation is stored against the option's position among the
+        // columns that were actually mapped, not against its slot number: slot
+        // 4 with slot 3 left empty is the third option the question will have,
+        // and the explanation has to land on that one.
+        $explanationSlots = [];
+        $mappedOptionPosition = 0;
+
         for ($slot = 1; $slot <= $this->answerOptionSlotCount(); $slot++) {
-            $claim($this->optionKey($slot), FellowshipImportMappingTarget::AnswerOption);
+            if ($claim($this->optionKey($slot), FellowshipImportMappingTarget::AnswerOption)) {
+                $explanationSlots[$slot] = ++$mappedOptionPosition;
+            }
+        }
+
+        for ($slot = 1; $slot <= $this->answerOptionSlotCount(); $slot++) {
+            // An explanation for an option column the admin did not map has no
+            // answer to explain, so it is left out rather than attached to
+            // whichever option happens to sit in that position.
+            if (! isset($explanationSlots[$slot])) {
+                continue;
+            }
+
+            $claim(
+                $this->optionExplanationKey($slot),
+                FellowshipImportMappingTarget::AnswerOptionExplanation,
+                $explanationSlots[$slot],
+            );
         }
 
         foreach ($this->headers() as $index => $header) {
@@ -1291,6 +1338,14 @@ class ImportFellowshipQuestions extends Page
             return $this->targetLabel($target);
         }
 
+        // Checked before the plain option prefix, which this key also starts
+        // with.
+        if (str_starts_with($key, 'option_explanation_')) {
+            return __('admin.fellowship.field_import_answer_option_explanation_number', [
+                'number' => (int) str_replace('option_explanation_', '', $key),
+            ]);
+        }
+
         return __('admin.fellowship.field_import_answer_option_number', [
             'number' => (int) str_replace('option_', '', $key),
         ]);
@@ -1318,9 +1373,13 @@ class ImportFellowshipQuestions extends Page
         }
 
         $optionHeaders = $map->headersFor(FellowshipImportMappingTarget::AnswerOption);
+        // Keyed by the option's stored position, which is the slot each option
+        // is restored into above.
+        $explanationHeaders = $map->optionExplanationHeaders();
 
         for ($slot = 1; $slot <= $this->answerOptionSlotCount(); $slot++) {
             $system[$this->optionKey($slot)] = $optionHeaders[$slot - 1] ?? null;
+            $system[$this->optionExplanationKey($slot)] = $explanationHeaders[$slot] ?? null;
         }
 
         $state = ['system' => $system];

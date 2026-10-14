@@ -25,21 +25,22 @@ use App\Support\Learning\QuestionSnapshot;
  * Performance Topic and any number of dynamic filter values, none of which a
  * chapter-quiz question has.
  *
- * @phpstan-type SnapshotOption array{key: string, option_text: string, is_correct: bool, order: int}
+ * @phpstan-type SnapshotOption array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}
  * @phpstan-type SnapshotTopic array{filter_id: int|null, filter_name: string|null, value_id: int|null, value: string|null}
  * @phpstan-type SnapshotFilter array{filter_id: int|null, filter_name: string, value_id: int|null, value: string}
  */
 final readonly class FellowshipQuestionSnapshot
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /**
-     * @param  list<array{key: string, option_text: string, is_correct: bool, order: int}>  $options
+     * @param  list<array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}>  $options
      * @param  array{filter_id: int|null, filter_name: string|null, value_id: int|null, value: string|null}  $performanceTopic
      * @param  list<array{filter_id: int|null, filter_name: string, value_id: int|null, value: string}>  $filters
      */
     private function __construct(
         public ?int $questionId,
+        public ?string $title,
         public string $questionText,
         public ?string $explanation,
         public ?string $difficulty,
@@ -60,6 +61,7 @@ final readonly class FellowshipQuestionSnapshot
             ->map(static fn ($option): array => [
                 'key' => (string) $option->getKey(),
                 'option_text' => (string) $option->option_text,
+                'explanation' => self::nullableText($option->explanation),
                 'is_correct' => (bool) $option->is_correct,
                 'order' => (int) $option->order,
             ])
@@ -81,6 +83,7 @@ final readonly class FellowshipQuestionSnapshot
 
         return new self(
             questionId: $question->getKey(),
+            title: self::nullableText($question->title),
             questionText: (string) $question->question_text,
             explanation: $question->explanation !== null && $question->explanation !== '' ? (string) $question->explanation : null,
             difficulty: $question->difficulty?->value,
@@ -100,11 +103,14 @@ final readonly class FellowshipQuestionSnapshot
      */
     public static function fromArray(array $snapshot): self
     {
-        /** @var list<array{key: string, option_text: string, is_correct: bool, order: int}> $options */
+        /** @var list<array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}> $options */
         $options = array_values(array_map(
             static fn (array $option): array => [
                 'key' => (string) ($option['key'] ?? ''),
                 'option_text' => (string) ($option['option_text'] ?? ''),
+                // Absent in every snapshot taken before per-option
+                // explanations existed, which reads as "none".
+                'explanation' => self::nullableText($option['explanation'] ?? null),
                 'is_correct' => (bool) ($option['is_correct'] ?? false),
                 'order' => (int) ($option['order'] ?? 0),
             ],
@@ -126,6 +132,7 @@ final readonly class FellowshipQuestionSnapshot
 
         return new self(
             questionId: isset($snapshot['question_id']) ? (int) $snapshot['question_id'] : null,
+            title: self::nullableText($snapshot['title'] ?? null),
             questionText: (string) ($snapshot['question_text'] ?? ''),
             explanation: isset($snapshot['explanation']) && $snapshot['explanation'] !== null
                 ? (string) $snapshot['explanation']
@@ -153,6 +160,7 @@ final readonly class FellowshipQuestionSnapshot
         return [
             'version' => $this->version,
             'question_id' => $this->questionId,
+            'title' => $this->title,
             'question_text' => $this->questionText,
             'explanation' => $this->explanation,
             'difficulty' => $this->difficulty,
@@ -164,24 +172,59 @@ final readonly class FellowshipQuestionSnapshot
 
     /**
      * The options as the student is shown them: key and text, in the order the
-     * admin had set. Correctness is deliberately absent, so this is safe to
-     * return for a question the student has not answered yet.
+     * admin had set. Correctness and the per-option explanations are
+     * deliberately absent, so this is safe to return for a question the student
+     * has not answered yet.
      *
      * @return list<array{key: string, option_text: string}>
      */
     public function presentableOptions(): array
     {
-        $options = $this->options;
-
-        usort($options, static fn (array $a, array $b): int => [$a['order'], $a['key']] <=> [$b['order'], $b['key']]);
-
         return array_values(array_map(
             static fn (array $option): array => [
                 'key' => $option['key'],
                 'option_text' => $option['option_text'],
             ],
-            $options,
+            $this->orderedOptions(),
         ));
+    }
+
+    /**
+     * The options with everything the question itself gives away: which one is
+     * correct, and why each one is right or wrong.
+     *
+     * Only ever for a question the student has already answered, or for an
+     * authorized review of a completed session — the caller decides that, and
+     * {@see presentableOptions()} is what an unanswered question gets.
+     *
+     * @return list<array{key: string, option_text: string, explanation: string|null, is_correct: bool}>
+     */
+    public function revealedOptions(): array
+    {
+        return array_values(array_map(
+            static fn (array $option): array => [
+                'key' => $option['key'],
+                'option_text' => $option['option_text'],
+                'explanation' => $option['explanation'],
+                'is_correct' => $option['is_correct'],
+            ],
+            $this->orderedOptions(),
+        ));
+    }
+
+    /**
+     * The captured options in the order the admin had set them, which is the
+     * order the student was shown and the order the sidebar must keep.
+     *
+     * @return list<array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}>
+     */
+    private function orderedOptions(): array
+    {
+        $options = $this->options;
+
+        usort($options, static fn (array $a, array $b): int => [$a['order'], $a['key']] <=> [$b['order'], $b['key']]);
+
+        return array_values($options);
     }
 
     public function hasOption(string $key): bool
@@ -190,7 +233,7 @@ final readonly class FellowshipQuestionSnapshot
     }
 
     /**
-     * @return array{key: string, option_text: string, is_correct: bool, order: int}|null
+     * @return array{key: string, option_text: string, explanation: string|null, is_correct: bool, order: int}|null
      */
     public function option(string $key): ?array
     {
@@ -229,6 +272,31 @@ final readonly class FellowshipQuestionSnapshot
         }
 
         return $this->option($key)['option_text'] ?? null;
+    }
+
+    /**
+     * The explanation of one captured option, or null when it has none.
+     */
+    public function optionExplanation(?string $key): ?string
+    {
+        if ($key === null) {
+            return null;
+        }
+
+        return $this->option($key)['explanation'] ?? null;
+    }
+
+    /**
+     * Empty is stored as absent, so a cleared field and one never filled in
+     * read back the same way.
+     */
+    private static function nullableText(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        return $value === '' ? null : $value;
     }
 
     public function topicValueId(): ?int

@@ -39,6 +39,9 @@ class ChapterResource extends JsonResource
             'id' => $this->id,
             'subject_id' => $this->subject_id,
             'title' => $this->title,
+            // Where this chapter's content was taken from. Null for every
+            // chapter written before the field existed.
+            'references' => $this->references,
             'order' => $this->order,
             'is_completed' => $this->isCompleted,
             'reading_progress' => $this->readingProgress,
