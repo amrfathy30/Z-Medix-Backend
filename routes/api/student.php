@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\Student\BookController;
+use App\Http\Controllers\Api\Student\BookmarkController;
 use App\Http\Controllers\Api\Student\ChapterController;
 use App\Http\Controllers\Api\Student\ChapterPageController;
 use App\Http\Controllers\Api\Student\ChapterQuizController;
@@ -12,11 +14,16 @@ use App\Http\Controllers\Api\Student\FellowshipSessionResultController;
 use App\Http\Controllers\Api\Student\FellowshipSessionStateController;
 use App\Http\Controllers\Api\Student\HighlightController;
 use App\Http\Controllers\Api\Student\NoteController;
+use App\Http\Controllers\Api\Student\PrivateBookController;
+use App\Http\Controllers\Api\Student\PrivateBookPdfController;
 use App\Http\Controllers\Api\Student\QuizAnswerController;
 use App\Http\Controllers\Api\Student\QuizAttemptController;
+use App\Http\Controllers\Api\Student\QuizAttemptHistoryController;
 use App\Http\Controllers\Api\Student\ReportCaseController;
 use App\Http\Controllers\Api\Student\StudyResumeController;
 use App\Http\Controllers\Api\Student\StudySessionController;
+use App\Http\Controllers\Api\Student\SubjectController;
+use App\Http\Controllers\Api\Student\SubjectStatisticsController;
 use Illuminate\Support\Facades\Route;
 
 // Authenticated student endpoints. The group already carries `auth:sanctum`,
@@ -32,8 +39,33 @@ Route::prefix('study')->name('study.')->group(function (): void {
     Route::post('sessions', [StudySessionController::class, 'store'])->name('sessions.store');
     Route::post('sessions/{studySession}/end', [StudySessionController::class, 'end'])->name('sessions.end');
 
+    // Where the study flow starts. A subject holds two independent kinds of
+    // content — its chapter track and its platform books — so its details
+    // carry both, and neither is nested inside the other.
+    Route::get('subjects', [SubjectController::class, 'index'])->name('subjects.index');
+    Route::get('subjects/{subject}', [SubjectController::class, 'show'])->name('subjects.show');
+
+    // Results and statistics for one subject, counted from the student's own
+    // recorded activity. The subject's overall quiz result is part of this
+    // payload rather than a second endpoint that could disagree with it.
+    Route::get('subjects/{subject}/statistics', SubjectStatisticsController::class)->name('subjects.statistics');
+
     // Where the student left off, kept apart from study sessions.
     Route::get('subjects/{subject}/resume', StudyResumeController::class)->name('subjects.resume');
+
+    // Platform books: reference material beside the chapter track, never
+    // sequenced behind it. A PDF book is opened as a file, a content book as
+    // pages.
+    Route::get('subjects/{subject}/books', [BookController::class, 'index'])->name('subjects.books.index');
+    Route::get('books/{book}', [BookController::class, 'show'])->name('books.show');
+    Route::get('books/{book}/pages', [BookController::class, 'pages'])->name('books.pages');
+
+    // The student's dedicated Highlights, Notes and Bookmarks area: what they
+    // marked up across every subject, not on one page. Registered before the
+    // page-scoped routes below so the collection paths are unambiguous.
+    Route::get('highlights', [HighlightController::class, 'collection'])->name('highlights.collection');
+    Route::get('notes', [NoteController::class, 'collection'])->name('notes.collection');
+    Route::get('bookmarks', [BookmarkController::class, 'collection'])->name('bookmarks.collection');
 
     Route::get('chapters/{chapter}', [ChapterController::class, 'show'])->name('chapters.show');
     Route::get('chapter-pages/{chapterPage}', [ChapterPageController::class, 'show'])->name('chapter-pages.show');
@@ -46,6 +78,12 @@ Route::prefix('study')->name('study.')->group(function (): void {
     Route::post('chapter-pages/{chapterPage}/highlights', [HighlightController::class, 'store'])->name('chapter-pages.highlights.store');
     Route::delete('highlights/{highlight}', [HighlightController::class, 'destroy'])->name('highlights.destroy');
 
+    // A bookmark marks a place to come back to. It carries no writing of the
+    // student's own, so there is no update: it is created and removed only.
+    Route::get('chapter-pages/{chapterPage}/bookmarks', [BookmarkController::class, 'index'])->name('chapter-pages.bookmarks.index');
+    Route::post('chapter-pages/{chapterPage}/bookmarks', [BookmarkController::class, 'store'])->name('chapter-pages.bookmarks.store');
+    Route::delete('bookmarks/{bookmark}', [BookmarkController::class, 'destroy'])->name('bookmarks.destroy');
+
     Route::get('chapter-pages/{chapterPage}/notes', [NoteController::class, 'index'])->name('chapter-pages.notes.index');
     Route::post('chapter-pages/{chapterPage}/notes', [NoteController::class, 'store'])->name('chapter-pages.notes.store');
     Route::patch('notes/{note}', [NoteController::class, 'update'])->name('notes.update');
@@ -53,6 +91,10 @@ Route::prefix('study')->name('study.')->group(function (): void {
 
     // Starts a new attempt, or resumes the one left in progress.
     Route::post('chapters/{chapter}/quiz/start', ChapterQuizController::class)->name('chapters.quiz.start');
+    // Every attempt the student has made on this chapter's quiz, newest first:
+    // how they find the past attempts they can review. Attempts are kept
+    // permanently, so this list only grows.
+    Route::get('chapters/{chapter}/quiz/attempts', QuizAttemptHistoryController::class)->name('chapters.quiz.attempts');
     Route::get('quiz-attempts/{quizAttempt}', QuizAttemptController::class)->name('quiz-attempts.show');
     // Addressed by the attempt's own question row, so an attempt stays
     // answerable after the live question it was captured from is deleted.
@@ -92,4 +134,21 @@ Route::prefix('fellowship-sessions')->name('fellowship-sessions.')->group(functi
 
     Route::post('{fellowshipQuizSession}/questions/{fellowshipSessionQuestion}/answer', FellowshipAnswerController::class)
         ->name('questions.answer');
+});
+
+// The student's own library: PDFs they uploaded themselves, each filed under a
+// subject. Deliberately outside the `study` tree — these are the student's
+// files, not platform study content, and they never share a record, a disk or
+// an access rule with a platform book.
+//
+// The PDF lives on the private disk, so the download route below is the only
+// way it can be read: there is no public URL to a student's upload.
+Route::prefix('private-books')->name('private-books.')->group(function (): void {
+    Route::get('/', [PrivateBookController::class, 'index'])->name('index');
+    Route::post('/', [PrivateBookController::class, 'store'])->name('store');
+    Route::get('{privateBook}', [PrivateBookController::class, 'show'])->name('show');
+    Route::patch('{privateBook}', [PrivateBookController::class, 'update'])->name('update');
+    Route::delete('{privateBook}', [PrivateBookController::class, 'destroy'])->name('destroy');
+
+    Route::get('{privateBook}/pdf', PrivateBookPdfController::class)->name('pdf');
 });

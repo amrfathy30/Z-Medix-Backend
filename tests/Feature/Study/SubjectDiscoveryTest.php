@@ -1,0 +1,166 @@
+<?php
+
+namespace Tests\Feature\Study;
+
+use App\Enums\ContentStatus;
+use App\Models\Book;
+use App\Models\Chapter;
+use App\Models\Subject;
+use Laravel\Sanctum\Sanctum;
+
+/**
+ * How a student finds something to study: the subjects they may open, and what
+ * one subject holds.
+ *
+ * A subject holds two independent kinds of content, so its details carry a
+ * chapter track and a book list side by side — never books nested inside
+ * chapters (business context §4).
+ *
+ * The chapter track reports `is_accessible` from the backend's own rule, so the
+ * client draws a locked chapter rather than deciding for itself what is locked.
+ */
+class SubjectDiscoveryTest extends StudyTestCase
+{
+    public function test_a_student_lists_published_subjects_only(): void
+    {
+        $published = $this->subjectWithChapters(chapters: 1);
+        $draft = Subject::factory()->draft()->create();
+        $archived = Subject::factory()->archived()->create();
+
+        Sanctum::actingAs($this->student());
+
+        $response = $this->getJson($this->studyUrl.'/subjects')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $published->id);
+
+        $ids = collect($response->json('data'))->pluck('id');
+
+        $this->assertFalse($ids->contains($draft->id));
+        $this->assertFalse($ids->contains($archived->id));
+    }
+
+    public function test_the_listing_counts_content_and_progress(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 3, pages: 2);
+
+        Book::factory()->count(2)->create(['subject_id' => $subject->id]);
+        Book::factory()->draft()->create(['subject_id' => $subject->id]);
+
+        Sanctum::actingAs($student = $this->student());
+
+        $this->completeChapter($student, $subject->chapters()->first());
+
+        $this->getJson($this->studyUrl.'/subjects')
+            ->assertOk()
+            ->assertJsonPath('data.0.chapters_count', 3)
+            // The draft book is not counted: it is not student-facing content.
+            ->assertJsonPath('data.0.books_count', 2)
+            ->assertJsonPath('data.0.chapters.completed_chapters', 1)
+            ->assertJsonPath('data.0.chapters.total_chapters', 3)
+            ->assertJsonPath('data.0.chapters.percentage', 33.33);
+    }
+
+    public function test_subject_details_carry_chapters_and_books_side_by_side(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 2, pages: 2);
+        $book = Book::factory()->content()->create([
+            'subject_id' => $subject->id,
+            'title' => 'Clinical Anatomy',
+            'author' => 'A. Author',
+        ]);
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $subject->id)
+            ->assertJsonCount(2, 'data.chapters')
+            ->assertJsonCount(1, 'data.books')
+            ->assertJsonPath('data.books.0.id', $book->id)
+            ->assertJsonPath('data.books.0.title', 'Clinical Anatomy')
+            ->assertJsonPath('data.books.0.author', 'A. Author')
+            // Books are not nested inside a chapter, and never will be.
+            ->assertJsonMissingPath('data.chapters.0.books');
+    }
+
+    public function test_the_chapter_track_reports_lock_and_completion_state(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 3, pages: 2);
+        $chapters = $subject->chapters()->get();
+
+        Sanctum::actingAs($student = $this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonPath('data.chapters.0.is_accessible', true)
+            ->assertJsonPath('data.chapters.0.is_completed', false)
+            ->assertJsonPath('data.chapters.1.is_accessible', false)
+            ->assertJsonPath('data.chapters.2.is_accessible', false);
+
+        $this->completeChapter($student, $chapters->first());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonPath('data.chapters.0.is_completed', true)
+            ->assertJsonPath('data.chapters.1.is_accessible', true)
+            // Still one step at a time.
+            ->assertJsonPath('data.chapters.2.is_accessible', false);
+    }
+
+    public function test_the_chapter_track_reports_references_and_reading_progress(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1, pages: 4);
+        $chapter = $subject->chapters()->first();
+        $chapter->update(['references' => "Gray's Anatomy, 42nd ed."]);
+
+        Sanctum::actingAs($this->student());
+
+        $page = $chapter->pages()->first();
+        $this->postJson($this->studyUrl."/chapter-pages/{$page->id}/complete")->assertOk();
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonPath('data.chapters.0.references', "Gray's Anatomy, 42nd ed.")
+            ->assertJsonPath('data.chapters.0.reading_progress.completed_pages', 1)
+            ->assertJsonPath('data.chapters.0.reading_progress.total_pages', 4)
+            ->assertJsonPath('data.chapters.0.reading_progress.percentage', 25)
+            ->assertJsonPath('data.reading_progress.completed_pages', 1)
+            ->assertJsonPath('data.reading_progress.total_pages', 4);
+    }
+
+    public function test_unpublished_chapters_are_not_part_of_the_track(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 2, pages: 1);
+        $second = $subject->chapters()->get()->last();
+        $second->update(['status' => ContentStatus::Draft]);
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.chapters')
+            ->assertJsonPath('data.chapters_progress.total_chapters', 1);
+    }
+
+    public function test_an_unpublished_subject_cannot_be_opened(): void
+    {
+        $subject = Subject::factory()->draft()->create();
+        Chapter::factory()->withQuiz()->create(['subject_id' => $subject->id]);
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertNotFound()
+            ->assertJsonPath('code', 'SUBJECT_UNAVAILABLE');
+    }
+
+    public function test_subject_discovery_requires_authentication(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1);
+
+        $this->getJson($this->studyUrl.'/subjects')->assertUnauthorized();
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")->assertUnauthorized();
+    }
+}

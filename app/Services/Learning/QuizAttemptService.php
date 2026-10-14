@@ -128,19 +128,65 @@ class QuizAttemptService
     }
 
     /**
-     * @return array{total_questions: int, answered_questions: int, correct_answers: int, incorrect_answers: int}
+     * The attempt's result figures.
+     *
+     * Three scores, because they answer three different questions and only
+     * agree once the attempt is finished:
+     *
+     *  - `score` is the overall score: how many the student got right.
+     *  - `percentage` is the overall percentage, over every question in the
+     *    attempt — so it rises as the attempt is worked through and is the
+     *    figure a finished attempt is read by.
+     *  - `average_score` is accuracy over what has been answered so far, null
+     *    until something has been. It is the figure the Fellowship module
+     *    reports under the same name, so the two flows mean the same thing by
+     *    it (business context §15).
+     *
+     * @return array{total_questions: int, answered_questions: int, correct_answers: int, incorrect_answers: int, score: int, percentage: float, average_score: float|null}
      */
     public function tally(QuizAttempt $attempt): array
     {
-        $answered = $attempt->questions()->answered()->count();
-        $correct = $attempt->questions()->answered()->where('is_correct', true)->count();
+        return $this->tallyFromCounts(
+            $attempt->questions()->count(),
+            $attempt->questions()->answered()->count(),
+            $attempt->questions()->answered()->where('is_correct', true)->count(),
+        );
+    }
 
+    /**
+     * The same figures from counts already in hand.
+     *
+     * A listing of attempts gets its counts from one `withCount` over the page
+     * of results instead of three queries per attempt, and still scores them
+     * through this one formula — so a history row and the attempt it links to
+     * can never report different numbers.
+     *
+     * @return array{total_questions: int, answered_questions: int, correct_answers: int, incorrect_answers: int, score: int, percentage: float, average_score: float|null}
+     */
+    public function tallyFromCounts(int $total, int $answered, int $correct): array
+    {
         return [
-            'total_questions' => $attempt->questions()->count(),
+            'total_questions' => $total,
             'answered_questions' => $answered,
             'correct_answers' => $correct,
             'incorrect_answers' => $answered - $correct,
+            'score' => $correct,
+            'percentage' => $this->percentage($correct, $total),
+            'average_score' => $answered === 0 ? null : $this->percentage($correct, $answered),
         ];
+    }
+
+    /**
+     * Rounded to two decimal places, the same way every other score in the
+     * application is.
+     */
+    private function percentage(int $part, int $whole): float
+    {
+        if ($whole === 0) {
+            return 0.0;
+        }
+
+        return round($part / $whole * 100, 2);
     }
 
     /**

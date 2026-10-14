@@ -1,0 +1,3297 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Default module",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "EmailVerification"
+    },
+    {
+      "name": "Login"
+    },
+    {
+      "name": "Profile"
+    },
+    {
+      "name": "ForgotPassword"
+    },
+    {
+      "name": "Logout"
+    },
+    {
+      "name": "ResetPassword"
+    },
+    {
+      "name": "ChangePassword"
+    }
+  ],
+  "paths": {
+    "/public/pages/{slug}": {
+      "get": {
+        "summary": "pages",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "home",
+            "required": true,
+            "example": "home",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "en",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apidog-ignore-properties": [],
+                  "x-apidog-orders": []
+                },
+                "example": {
+                  "success": false,
+                  "message": "Page not found.",
+                  "errors": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-name": "Success",
+            "x-apidog-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Public/Pages",
+        "x-apidog-status": "developing",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44611926-run"
+      }
+    },
+    "/public/settings": {
+      "get": {
+        "summary": "settings",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "en",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apidog-ignore-properties": [],
+                  "x-apidog-orders": []
+                },
+                "example": {
+                  "success": true,
+                  "message": "Success.",
+                  "data": {
+                    "general": [
+                      {
+                        "key": "site_name",
+                        "value": "Z-MEDIX",
+                        "group": "general"
+                      },
+                      {
+                        "key": "site_logo",
+                        "value": null,
+                        "group": "general"
+                      },
+                      {
+                        "key": "app_store_url",
+                        "value": "",
+                        "group": "general"
+                      },
+                      {
+                        "key": "google_play_url",
+                        "value": "",
+                        "group": "general"
+                      },
+                      {
+                        "key": "site_tagline",
+                        "value": "Your Starter Platform Tagline",
+                        "group": "general"
+                      },
+                      {
+                        "key": "contact_email",
+                        "value": "info@example.test",
+                        "group": "general"
+                      },
+                      {
+                        "key": "support_email",
+                        "value": "support@example.test",
+                        "group": "general"
+                      }
+                    ],
+                    "home": [
+                      {
+                        "key": "hero_title",
+                        "value": "Welcome",
+                        "group": "home"
+                      },
+                      {
+                        "key": "hero_subtitle",
+                        "value": "A starter platform ready for your content",
+                        "group": "home"
+                      },
+                      {
+                        "key": "hero_description",
+                        "value": "Default placeholder description text. Replace it with your own product copy.",
+                        "group": "home"
+                      },
+                      {
+                        "key": "hero_primary_cta_text",
+                        "value": "Get Started",
+                        "group": "home"
+                      },
+                      {
+                        "key": "hero_secondary_cta_text",
+                        "value": "Learn More",
+                        "group": "home"
+                      },
+                      {
+                        "key": "how_it_works_title",
+                        "value": "How It Works",
+                        "group": "home"
+                      },
+                      {
+                        "key": "features_title",
+                        "value": "Features",
+                        "group": "home"
+                      },
+                      {
+                        "key": "testimonials_title",
+                        "value": "What Our Users Say",
+                        "group": "home"
+                      },
+                      {
+                        "key": "cta_banner_title",
+                        "value": "Ready to Get Started?",
+                        "group": "home"
+                      },
+                      {
+                        "key": "cta_banner_description",
+                        "value": "Default placeholder call-to-action copy. Replace it with your own.",
+                        "group": "home"
+                      },
+                      {
+                        "key": "faq_title",
+                        "value": "Frequently Asked Questions",
+                        "group": "home"
+                      }
+                    ],
+                    "footer": [
+                      {
+                        "key": "footer_description_1",
+                        "value": "Your smarter way to learn medicine.",
+                        "group": "footer"
+                      },
+                      {
+                        "key": "footer_description_2",
+                        "value": "AI-powered learning, medical resources, practice, and progress — all in one place.",
+                        "group": "footer"
+                      },
+                      {
+                        "key": "footer_copyright",
+                        "value": "© 2026 Z-MEDIX. All rights reserved.",
+                        "group": "footer"
+                      },
+                      {
+                        "key": "footer_contact_email",
+                        "value": "info@example.test",
+                        "group": "footer"
+                      },
+                      {
+                        "key": "footer_quick_links_title",
+                        "value": "Quick Links",
+                        "group": "footer"
+                      },
+                      {
+                        "key": "footer_customer_services_title",
+                        "value": "Customer Services",
+                        "group": "footer"
+                      }
+                    ],
+                    "social": [
+                      {
+                        "key": "social_twitter",
+                        "value": "",
+                        "group": "social"
+                      },
+                      {
+                        "key": "social_linkedin",
+                        "value": "",
+                        "group": "social"
+                      },
+                      {
+                        "key": "social_behance",
+                        "value": "",
+                        "group": "social"
+                      },
+                      {
+                        "key": "social_instagram",
+                        "value": "",
+                        "group": "social"
+                      },
+                      {
+                        "key": "social_facebook",
+                        "value": "",
+                        "group": "social"
+                      },
+                      {
+                        "key": "social_youtube",
+                        "value": "",
+                        "group": "social"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "x-apidog-name": "Success",
+            "x-apidog-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Public/Pages",
+        "x-apidog-status": "developing",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44612549-run"
+      }
+    },
+    "/public/countries": {
+      "get": {
+        "summary": "get countries",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "egypt",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apidog-orders": [],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-name": "Success",
+            "x-apidog-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Public/GEO ",
+        "x-apidog-status": "developing",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44733398-run"
+      }
+    },
+    "/public/countries/{country_id}/cities": {
+      "get": {
+        "summary": "get cities by country",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "country_id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "66",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "qina",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apidog-orders": [],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-name": "Success",
+            "x-apidog-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Public/GEO ",
+        "x-apidog-status": "developing",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44733399-run"
+      }
+    },
+    "/public/auth/register": {
+      "post": {
+        "summary": "student register",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "full_name": {
+                    "example": "هشام ",
+                    "type": "string"
+                  },
+                  "email": {
+                    "example": "hesham@zmedix.com",
+                    "type": "string"
+                  },
+                  "phone": {
+                    "example": "+201033466955",
+                    "type": "string"
+                  },
+                  "password": {
+                    "example": "Password123!",
+                    "type": "string"
+                  },
+                  "password_confirmation": {
+                    "example": "Password123!",
+                    "type": "string"
+                  },
+                  "country_id": {
+                    "description": "id country",
+                    "example": "65",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "full_name",
+                  "email",
+                  "phone",
+                  "password",
+                  "password_confirmation",
+                  "country_id"
+                ]
+              },
+              "example": {
+                "full_name": "هشام ",
+                "email": "hesham@zmedix.com",
+                "phone": "+201033466955",
+                "password": "Password123!",
+                "password_confirmation": "Password123!",
+                "country_id": "65"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apidog-orders": [],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-name": "Success",
+            "x-apidog-ordering": 0
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Auth/Register ",
+        "x-apidog-status": "developing",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734220-run"
+      }
+    },
+    "/public/auth/resend-otp": {
+      "post": {
+        "summary": "public.auth.email.send resend",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.email.send",
+        "tags": [
+          "EmailVerification"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "example": "hesham@zmedix.com",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "hesham@zmedix.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Verification email sent."
+                        },
+                        "data": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "data"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "data"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Email address is already verified."
+                        },
+                        "data": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "data"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "data"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Auth/EmailVerification",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734204-run"
+      }
+    },
+    "/public/auth/verify-otp": {
+      "post": {
+        "summary": "public.auth.email.send",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.email.send",
+        "tags": [
+          "EmailVerification"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "example": "hesham@zmedix.com",
+                    "type": "string"
+                  },
+                  "code": {
+                    "example": "364217",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "hesham@zmedix.com",
+                "code": "364217"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Verification email sent."
+                        },
+                        "data": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "data"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "data"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Email address is already verified."
+                        },
+                        "data": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "data"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "data"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Auth/EmailVerification",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734205-run"
+      }
+    },
+    "/public/auth/login": {
+      "post": {
+        "summary": "public.auth.login",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.login",
+        "tags": [
+          "Login"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "description": "student@zmedix.test",
+                    "example": "hesham@zmedix.com",
+                    "type": "string"
+                  },
+                  "password": {
+                    "example": "Password@123",
+                    "type": "string"
+                  },
+                  "remember_me": {
+                    "type": "boolean",
+                    "example": "1"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              },
+              "example": {
+                "email": "hesham@zmedix.com",
+                "password": "Password@123",
+                "remember_me": "1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Logged in successfully."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "$ref": "#/components/schemas/UserProfileResource"
+                        }
+                      },
+                      "required": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-orders": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "The provided credentials are incorrect."
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "additionalItems": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 1
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account is pending approval. Please check back later."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account has been suspended. Please contact support."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 2
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 3
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Auth/Login",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734211-run"
+      }
+    },
+    "/public/profile": {
+      "get": {
+        "summary": "public.profile.show",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.profile.show",
+        "tags": [
+          "Profile"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Success."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserProfileResource"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/Profile",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734218-run"
+      },
+      "post": {
+        "summary": "public.profile.update",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.profile.update",
+        "tags": [
+          "Profile"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "multipart/form-data",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "full_name": {
+                    "example": "هشام",
+                    "type": "string"
+                  },
+                  "profile_photo": {
+                    "format": "binary",
+                    "type": "string",
+                    "example": "file:///Users/hanafawy/Downloads/ChatGPT Image Oct 3, 2026, 01_14_47 AM.png"
+                  },
+                  "field_of_study": {
+                    "example": "asdjahsdksa",
+                    "type": "string"
+                  },
+                  "institution": {
+                    "example": "",
+                    "type": "string"
+                  },
+                  "country_id": {
+                    "example": "",
+                    "type": "string"
+                  },
+                  "phone": {
+                    "example": "",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "full_name": "هشام",
+                "profile_photo": "file:///Users/hanafawy/Downloads/ChatGPT Image Oct 3, 2026, 01_14_47 AM.png",
+                "field_of_study": "asdjahsdksa",
+                "institution": "",
+                "country_id": "",
+                "phone": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Profile updated successfully."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserProfileResource"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 2
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/Profile",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734219-run"
+      }
+    },
+    "/public/auth/forgot-password/resend": {
+      "post": {
+        "summary": "public.auth.forgot-password Resend",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.forgot-password",
+        "tags": [
+          "ForgotPassword"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "example": "lecturer@kanun.test",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "lecturer@kanun.test"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Always return a generic response to avoid exposing whether the email exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "If that email address is in our system, we have sent a password reset link."
+                    },
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Auth/ForgotPassword",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734206-run"
+      }
+    },
+    "/public/auth/forgot-password/verify-otp": {
+      "post": {
+        "summary": "public.auth.forgot-password Verify OTP",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.forgot-password",
+        "tags": [
+          "ForgotPassword"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "example": "hesham@zmedix.com",
+                    "type": "string"
+                  },
+                  "code": {
+                    "example": "469937",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "hesham@zmedix.com",
+                "code": "469937"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Always return a generic response to avoid exposing whether the email exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "If that email address is in our system, we have sent a password reset link."
+                    },
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Auth/ForgotPassword",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734207-run"
+      }
+    },
+    "/public/auth/forgot-password": {
+      "post": {
+        "summary": "public.auth.forgot-password",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.forgot-password",
+        "tags": [
+          "ForgotPassword"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "example": "hesham@zmedix.com",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "hesham@zmedix.com"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Always return a generic response to avoid exposing whether the email exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "If that email address is in our system, we have sent a password reset link."
+                    },
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Auth/ForgotPassword",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734208-run"
+      }
+    },
+    "/public/auth/logout": {
+      "post": {
+        "summary": "public.auth.logout",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.logout",
+        "tags": [
+          "Logout"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Logged out successfully."
+                    },
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/Logout",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734217-run"
+      }
+    },
+    "/public/auth/reset-password": {
+      "post": {
+        "summary": "public.auth.reset-password",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.reset-password",
+        "tags": [
+          "ResetPassword"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "example": "hesham@zmedix.com",
+                    "type": "string"
+                  },
+                  "reset_token": {
+                    "description": "get it from verify-otp endpoint response ",
+                    "example": "lMuvARURFeWGS5etInCEbckZ1ds2m9Yy4NMTDcTXdur71TjyaK6W2uZLuQDR1HId",
+                    "type": "string"
+                  },
+                  "password": {
+                    "example": "Password@123",
+                    "type": "string"
+                  },
+                  "password_confirmation": {
+                    "example": "Password@123",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "hesham@zmedix.com",
+                "reset_token": "lMuvARURFeWGS5etInCEbckZ1ds2m9Yy4NMTDcTXdur71TjyaK6W2uZLuQDR1HId",
+                "password": "Password@123",
+                "password_confirmation": "Password@123"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {},
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          }
+        },
+        "security": [],
+        "x-apidog-folder": "Auth/ResetPassword",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734209-run"
+      }
+    },
+    "/public/auth/change-password": {
+      "post": {
+        "summary": "public.auth.change-password",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.change-password",
+        "tags": [
+          "ChangePassword"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current_password": {
+                    "example": "Password@123",
+                    "type": "string"
+                  },
+                  "password": {
+                    "example": "Password123!",
+                    "type": "string"
+                  },
+                  "password_confirmation": {
+                    "example": "Password123!",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "current_password": "Password@123",
+                "password": "Password123!",
+                "password_confirmation": "Password123!"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Password changed successfully."
+                    },
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException",
+            "description": "",
+            "x-apidog-ordering": 1
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 2
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/ChangePassword",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734210-run"
+      }
+    },
+    "/public/auth/change-phone/verify": {
+      "post": {
+        "summary": "change-phone.verify",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.login",
+        "tags": [
+          "Login"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "example": "999999",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "code": "999999"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Logged in successfully."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "$ref": "#/components/schemas/UserProfileResource"
+                        }
+                      },
+                      "required": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-orders": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "The provided credentials are incorrect."
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "additionalItems": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 1
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account is pending approval. Please check back later."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account has been suspended. Please contact support."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 2
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 3
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/Rechange phone",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734212-run"
+      }
+    },
+    "/public/auth/change-phone/resend": {
+      "post": {
+        "summary": "change-phone.verify resend",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.login",
+        "tags": [
+          "Login"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Logged in successfully."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "$ref": "#/components/schemas/UserProfileResource"
+                        }
+                      },
+                      "required": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-orders": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "The provided credentials are incorrect."
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "additionalItems": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 1
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account is pending approval. Please check back later."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account has been suspended. Please contact support."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 2
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 3
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/Rechange phone",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734213-run"
+      }
+    },
+    "/public/auth/change-phone": {
+      "post": {
+        "summary": "change-phone",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.login",
+        "tags": [
+          "Login"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "example": "+201099998888",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "phone": "+201099998888"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Logged in successfully."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "$ref": "#/components/schemas/UserProfileResource"
+                        }
+                      },
+                      "required": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-orders": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "The provided credentials are incorrect."
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "additionalItems": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 1
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account is pending approval. Please check back later."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account has been suspended. Please contact support."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 2
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 3
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/Rechange phone",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734214-run"
+      }
+    },
+    "/public/auth/verify-phone": {
+      "post": {
+        "summary": "verify-phone",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.login",
+        "tags": [
+          "Login"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "example": "123456",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "code": "123456"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Logged in successfully."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "$ref": "#/components/schemas/UserProfileResource"
+                        }
+                      },
+                      "required": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-orders": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "The provided credentials are incorrect."
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "additionalItems": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 1
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account is pending approval. Please check back later."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account has been suspended. Please contact support."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 2
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 3
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/phone OTP",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734215-run"
+      }
+    },
+    "/public/auth/verify-phone/send": {
+      "post": {
+        "summary": "verify-phone send",
+        "deprecated": false,
+        "description": "",
+        "operationId": "public.auth.login",
+        "tags": [
+          "Login"
+        ],
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "Logged in successfully."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "user": {
+                          "$ref": "#/components/schemas/UserProfileResource"
+                        }
+                      },
+                      "required": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-orders": [
+                        "token",
+                        "user"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "data"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 0
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "The provided credentials are incorrect."
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "additionalItems": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 1
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account is pending approval. Please check back later."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "Your account has been suspended. Please contact support."
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 0,
+                          "maxItems": 0,
+                          "additionalItems": false
+                        }
+                      },
+                      "required": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-orders": [
+                        "success",
+                        "message",
+                        "errors"
+                      ],
+                      "x-apidog-ignore-properties": []
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {},
+            "x-apidog-ordering": 2
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException",
+            "description": "",
+            "x-apidog-ordering": 3
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-apidog-folder": "Auth/phone OTP",
+        "x-apidog-status": "released",
+        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734216-run"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChangePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "password_confirmation": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "current_password",
+          "password",
+          "password_confirmation"
+        ],
+        "title": "ChangePasswordRequest",
+        "x-apidog-orders": [
+          "current_password",
+          "password",
+          "password_confirmation"
+        ],
+        "x-apidog-ignore-properties": [],
+        "x-apidog-folder": ""
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "ForgotPasswordRequest",
+        "x-apidog-orders": [
+          "email"
+        ],
+        "x-apidog-ignore-properties": [],
+        "x-apidog-folder": ""
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "x-apidog-orders": [
+          "email",
+          "password"
+        ],
+        "x-apidog-ignore-properties": [],
+        "x-apidog-folder": ""
+      },
+      "ProfileUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255
+          }
+        },
+        "title": "ProfileUpdateRequest",
+        "x-apidog-orders": [
+          "name",
+          "first_name",
+          "last_name",
+          "email"
+        ],
+        "x-apidog-ignore-properties": [],
+        "x-apidog-folder": ""
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "password_confirmation": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "token",
+          "email",
+          "password",
+          "password_confirmation"
+        ],
+        "title": "ResetPasswordRequest",
+        "x-apidog-orders": [
+          "token",
+          "email",
+          "password",
+          "password_confirmation"
+        ],
+        "x-apidog-ignore-properties": [],
+        "x-apidog-folder": ""
+      },
+      "UserProfileResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "is_email_verified": {
+            "type": "string"
+          },
+          "email_verified_at": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "last_login_at": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "first_name",
+          "last_name",
+          "email",
+          "is_email_verified",
+          "email_verified_at",
+          "type",
+          "status",
+          "last_login_at",
+          "created_at"
+        ],
+        "title": "UserProfileResource",
+        "x-apidog-orders": [
+          "id",
+          "name",
+          "first_name",
+          "last_name",
+          "email",
+          "is_email_verified",
+          "email_verified_at",
+          "type",
+          "status",
+          "last_login_at",
+          "created_at"
+        ],
+        "x-apidog-ignore-properties": [],
+        "x-apidog-folder": ""
+      }
+    },
+    "responses": {
+      "ValidationException": {
+        "description": "",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Errors overview."
+                },
+                "errors": {
+                  "type": "object",
+                  "description": "A detailed description of each field that failed validation.",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "x-apidog-orders": []
+                }
+              },
+              "required": [
+                "message",
+                "errors"
+              ],
+              "x-apidog-orders": [
+                "message",
+                "errors"
+              ]
+            }
+          }
+        }
+      },
+      "AuthenticationException": {
+        "description": "",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Error overview."
+                }
+              },
+              "required": [
+                "message"
+              ],
+              "x-apidog-orders": [
+                "message"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

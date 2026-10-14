@@ -66,4 +66,13 @@ class ChapterPage extends Model
     {
         return $this->positionAmongPages();
     }
+
+    /**
+     * Every student's bookmarks on this page. Student endpoints always read
+     * through {@see StudentBookmark::scopeForStudent()} instead.
+     */
+    public function bookmarks(): HasMany
+    {
+        return $this->hasMany(StudentBookmark::class);
+    }
 }
