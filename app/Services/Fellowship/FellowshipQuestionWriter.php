@@ -24,6 +24,12 @@ use App\Support\Fellowship\ImportRowPayload;
  *  - a mapped column left blank clears it, because the admin said so explicitly;
  *  - a filter the file never mentioned is left exactly as it was.
  *
+ * The optional title, the question's explanation and the per-option
+ * explanations follow that same rule, and for the same reason: a file that says
+ * nothing about them is not an instruction to erase what the admin already
+ * wrote. This is also what the duplicate review screen already shows an admin
+ * before they choose — an unmapped column is marked as not in the import.
+ *
  * Sessions are untouched either way: they serve their own snapshots, so an
  * update here cannot move a score a student has already earned.
  *
@@ -46,6 +52,7 @@ class FellowshipQuestionWriter
 
         /** @var FellowshipQuestion $question */
         $question = $fellowship->questions()->create([
+            'title' => $payload->title,
             'question_text' => $payload->questionText,
             'explanation' => $payload->explanation,
             'difficulty' => $this->difficulty($payload),
@@ -64,6 +71,11 @@ class FellowshipQuestionWriter
      * The option set is rewritten rather than merged: an imported row is the
      * whole answer set for that question, and matching old options to new ones
      * by text would silently keep an option the admin had removed.
+     *
+     * The explanations the rewrite would otherwise discard are read off the old
+     * options first and carried across by position, so an import that says
+     * nothing about them leaves them where they were. A position this import did
+     * map takes the file's word for it, empty cell included.
      */
     public function update(
         Fellowship $fellowship,
@@ -81,15 +93,31 @@ class FellowshipQuestionWriter
 
         $this->filters->assertPerformanceTopic($fellowship, $topicValueId);
 
-        $question->update([
+        $attributes = [
             'question_text' => $payload->questionText,
-            'explanation' => $payload->explanation,
             'difficulty' => $this->difficulty($payload),
             'performance_filter_value_id' => $topicValueId,
-        ]);
+        ];
+
+        // A file with no column for one of these is silent about it, not asking
+        // for it to be cleared; one that mapped the column and left the cell
+        // empty is asking exactly that, the way every other optional field here
+        // works. Both cases reach the payload as the same null, so the map — not
+        // the value — is what tells them apart.
+        if ($map->has(FellowshipImportMappingTarget::Title)) {
+            $attributes['title'] = $payload->title;
+        }
+
+        if ($map->has(FellowshipImportMappingTarget::Explanation)) {
+            $attributes['explanation'] = $payload->explanation;
+        }
+
+        $question->update($attributes);
+
+        $carriedExplanations = $this->storedOptionExplanations($question);
 
         $question->options()->delete();
-        $this->writeOptions($question, $payload);
+        $this->writeOptions($question, $payload, $carriedExplanations);
 
         $question->load('filterValues');
         $this->applyFilterColumns($fellowship, $question, $payload, $map);
@@ -100,19 +128,42 @@ class FellowshipQuestionWriter
     /**
      * Write the row's options, the correct one flagged, in the order their
      * columns were mapped.
+     *
+     * @param  array<int, string|null>  $carriedExplanations  Explanations to keep where this import mapped none, by position.
      */
-    private function writeOptions(FellowshipQuestion $question, ImportRowPayload $payload): void
-    {
-        $options = $payload->nonEmptyOptions();
+    private function writeOptions(
+        FellowshipQuestion $question,
+        ImportRowPayload $payload,
+        array $carriedExplanations = [],
+    ): void {
+        $entries = $payload->nonEmptyOptionEntries();
         $correctIndex = $payload->correctOptionIndex();
 
-        foreach ($options as $index => $optionText) {
+        foreach ($entries as $index => $entry) {
             $question->options()->create([
-                'option_text' => $optionText,
+                'option_text' => $entry['text'],
+                'explanation' => $entry['explanation_mapped']
+                    ? $entry['explanation']
+                    : ($carriedExplanations[$index] ?? null),
                 'is_correct' => $index === $correctIndex,
                 'order' => $index + 1,
             ]);
         }
+    }
+
+    /**
+     * The explanations a question's options hold right now, by position, so a
+     * rewrite of the option set can put back the ones this import is silent
+     * about.
+     *
+     * @return array<int, string|null>
+     */
+    private function storedOptionExplanations(FellowshipQuestion $question): array
+    {
+        return $question->options()->get()
+            ->values()
+            ->map(static fn ($option): ?string => $option->explanation)
+            ->all();
     }
 
     /**

@@ -67,6 +67,10 @@ class QuestionsRelationManager extends RelationManager
         return $schema->components([
             Section::make(__('admin.fellowship.question_section_overview'))
                 ->schema([
+                    TextEntry::make('title')
+                        ->label(__('admin.fellowship.field_title'))
+                        ->placeholder('—')
+                        ->columnSpanFull(),
                     TextEntry::make('question_text')
                         ->label(__('admin.fellowship.field_question_text'))
                         ->columnSpanFull(),
@@ -95,6 +99,11 @@ class QuestionsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('question_text')
             ->columns([
+                TextColumn::make('title')
+                    ->label(__('admin.fellowship.field_title'))
+                    ->placeholder('—')
+                    ->searchable()
+                    ->limit(40),
                 TextColumn::make('question_text')
                     ->label(__('admin.fellowship.field_question_text'))
                     ->searchable()

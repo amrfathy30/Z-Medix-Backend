@@ -372,7 +372,7 @@ class QuestionTest extends LearningTestCase
             ->values()
             ->all();
 
-        $this->assertSame(['question', 'options'], $componentNames);
+        $this->assertSame(['title', 'question', 'options'], $componentNames);
     }
 
     public function test_the_question_edit_page_hides_delete_for_the_last_question(): void

@@ -25,6 +25,7 @@ class FellowshipActivityResource extends JsonResource
         return [
             'session_id' => $this->fellowship_quiz_session_id,
             'session_title' => $this->session?->title,
+            'title' => $this->snapshot()->title,
             'question_text' => $this->snapshot()->questionText,
             'performance_topic' => $this->topic_value,
             'difficulty' => $this->difficulty,

@@ -15,6 +15,12 @@ namespace App\Support\Fellowship;
  * with a null value where the cell was blank — the distinction between "mapped
  * and empty" and "absent" is the whole point.
  *
+ * The per-option explanations follow the same rule as the filters, for the same
+ * reason: `optionExplanations` holds an entry only for the option positions this
+ * import mapped an explanation column to, with a null value where that cell was
+ * blank. An update clears a mapped-and-empty explanation and leaves an absent
+ * one exactly as it was, and only a keyed entry can tell those two apart.
+ *
  * @phpstan-type PayloadFilter array{filter_id: int|null, filter_name: string, value: string|null}
  */
 final readonly class ImportRowPayload
@@ -23,16 +29,19 @@ final readonly class ImportRowPayload
 
     /**
      * @param  list<string>  $options  Answer option texts, in the order their columns were mapped.
+     * @param  array<int, string|null>  $optionExplanations  Keyed by the same index as `$options`; present only for mapped positions.
      * @param  list<array{filter_id: int|null, filter_name: string, value: string|null}>  $filters
      * @param  array<string, string|null>  $raw  The row as read, keyed by header, for the side-by-side comparison.
      */
     private function __construct(
         public string $questionText,
+        public ?string $title,
         public ?string $explanation,
         public ?string $difficulty,
         public ?string $correctAnswer,
         public ?string $performanceTopic,
         public array $options,
+        public array $optionExplanations,
         public array $filters,
         public array $raw,
         public int $version = self::VERSION,
@@ -40,6 +49,7 @@ final readonly class ImportRowPayload
 
     /**
      * @param  list<string>  $options
+     * @param  array<int, string|null>  $optionExplanations
      * @param  list<array{filter_id: int|null, filter_name: string, value: string|null}>  $filters
      * @param  array<string, string|null>  $raw
      */
@@ -52,14 +62,18 @@ final readonly class ImportRowPayload
         array $options,
         array $filters,
         array $raw = [],
+        ?string $title = null,
+        array $optionExplanations = [],
     ): self {
         return new self(
             questionText: $questionText,
+            title: $title,
             explanation: $explanation,
             difficulty: $difficulty,
             correctAnswer: $correctAnswer,
             performanceTopic: $performanceTopic,
             options: array_values($options),
+            optionExplanations: self::normalizeOptionExplanations($optionExplanations),
             filters: array_values($filters),
             raw: $raw,
         );
@@ -94,11 +108,17 @@ final readonly class ImportRowPayload
 
         return new self(
             questionText: (string) ($payload['question_text'] ?? ''),
+            title: self::nullableString($payload['title'] ?? null),
             explanation: self::nullableString($payload['explanation'] ?? null),
             difficulty: self::nullableString($payload['difficulty'] ?? null),
             correctAnswer: self::nullableString($payload['correct_answer'] ?? null),
             performanceTopic: self::nullableString($payload['performance_topic'] ?? null),
             options: $options,
+            // Absent from every payload staged before per-option explanations
+            // existed, which reads as "this import mapped none".
+            optionExplanations: self::normalizeOptionExplanations(
+                is_array($payload['option_explanations'] ?? null) ? $payload['option_explanations'] : [],
+            ),
             filters: $filters,
             raw: $raw,
             version: (int) ($payload['version'] ?? self::VERSION),
@@ -113,11 +133,13 @@ final readonly class ImportRowPayload
         return [
             'version' => $this->version,
             'question_text' => $this->questionText,
+            'title' => $this->title,
             'explanation' => $this->explanation,
             'difficulty' => $this->difficulty,
             'correct_answer' => $this->correctAnswer,
             'performance_topic' => $this->performanceTopic,
             'options' => $this->options,
+            'option_explanations' => $this->optionExplanations,
             'filters' => $this->filters,
             'raw' => $this->raw,
         ];
@@ -135,6 +157,39 @@ final readonly class ImportRowPayload
             array_map(static fn (string $option): string => trim($option), $this->options),
             static fn (string $option): bool => $option !== '',
         ));
+    }
+
+    /**
+     * The options that survive the blanks, each with the explanation its own
+     * mapped column carried.
+     *
+     * `explanation_mapped` is what separates "mapped, and empty" — which clears
+     * — from "not mapped at all", which an update preserves. Both arrive here as
+     * a null explanation, and only the flag tells them apart.
+     *
+     * @return list<array{text: string, explanation: string|null, explanation_mapped: bool}>
+     */
+    public function nonEmptyOptionEntries(): array
+    {
+        $entries = [];
+
+        foreach ($this->options as $index => $option) {
+            $text = trim($option);
+
+            if ($text === '') {
+                continue;
+            }
+
+            $mapped = array_key_exists($index, $this->optionExplanations);
+
+            $entries[] = [
+                'text' => $text,
+                'explanation' => $mapped ? $this->optionExplanations[$index] : null,
+                'explanation_mapped' => $mapped,
+            ];
+        }
+
+        return $entries;
     }
 
     /**
@@ -282,6 +337,31 @@ final readonly class ImportRowPayload
             $this->filters,
             static fn (array $filter): bool => $filter['value'] !== null && trim((string) $filter['value']) !== '',
         ));
+    }
+
+    /**
+     * Keys to ints, values to trimmed strings or null. JSON turns a sparse
+     * int-keyed array into an object, so the keys come back as strings and have
+     * to be put back the way they went in.
+     *
+     * @param  array<array-key, mixed>  $explanations
+     * @return array<int, string|null>
+     */
+    private static function normalizeOptionExplanations(array $explanations): array
+    {
+        $normalized = [];
+
+        foreach ($explanations as $index => $explanation) {
+            if (! is_numeric($index) || (int) $index < 0) {
+                continue;
+            }
+
+            $normalized[(int) $index] = self::nullableString($explanation);
+        }
+
+        ksort($normalized);
+
+        return $normalized;
     }
 
     private static function nullableString(mixed $value): ?string

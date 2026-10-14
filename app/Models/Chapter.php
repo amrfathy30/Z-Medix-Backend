@@ -19,6 +19,7 @@ class Chapter extends Model
     protected $fillable = [
         'subject_id',
         'title',
+        'references',
         'status',
         'order',
     ];

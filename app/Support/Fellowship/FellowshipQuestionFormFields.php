@@ -45,6 +45,14 @@ final class FellowshipQuestionFormFields
         return [
             Section::make(__('admin.fellowship.question_section_details'))
                 ->schema([
+                    // A short heading beside the question, never instead of it.
+                    // Optional: every question imported before this field has
+                    // none, and a bank that never uses titles stays valid.
+                    TextInput::make('title')
+                        ->label(__('admin.fellowship.field_title'))
+                        ->helperText(__('admin.fellowship.title_hint'))
+                        ->maxLength(255)
+                        ->columnSpanFull(),
                     Textarea::make('question_text')
                         ->label(__('admin.fellowship.field_question_text'))
                         ->required()
@@ -103,6 +111,11 @@ final class FellowshipQuestionFormFields
     /**
      * Answer options: at least two, exactly one marked correct, order
      * preserved.
+     *
+     * Each option carries its own explanation beside its text and its correct
+     * flag — why that answer is the right one, or why it is not. It is optional
+     * per option and separate from the question's own explanation, which is
+     * unchanged.
      */
     public static function optionsRepeater(): Repeater
     {
@@ -124,6 +137,12 @@ final class FellowshipQuestionFormFields
                     ->label(__('admin.fellowship.field_option_is_correct'))
                     ->inline(false)
                     ->default(false),
+                Textarea::make('explanation')
+                    ->label(__('admin.fellowship.field_option_explanation'))
+                    ->helperText(__('admin.fellowship.option_explanation_hint'))
+                    ->rows(2)
+                    ->maxLength(5000)
+                    ->columnSpanFull(),
             ])
             ->columns(3)
             ->rule(static function (): Closure {

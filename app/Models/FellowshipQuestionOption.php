@@ -18,6 +18,7 @@ class FellowshipQuestionOption extends Model
     protected $fillable = [
         'fellowship_question_id',
         'option_text',
+        'explanation',
         'is_correct',
         'order',
     ];
