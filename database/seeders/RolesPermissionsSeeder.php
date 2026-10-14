@@ -93,6 +93,25 @@ class RolesPermissionsSeeder extends Seeder
             'questions.update' => ['display_name_ar' => 'تعديل الأسئلة', 'display_name_en' => 'Update Questions'],
             'questions.delete' => ['display_name_ar' => 'حذف الأسئلة', 'display_name_en' => 'Delete Questions'],
 
+            // Fellowship question banks (fellowships -> questions/filters, fed by
+            // Excel imports). Its own permission family, separate from the
+            // Subject tree: a Fellowship has no chapters and no reading pages,
+            // and a role may be trusted with one bank and not the other.
+            'fellowships.view' => ['display_name_ar' => 'عرض الزمالات', 'display_name_en' => 'View Fellowships'],
+            'fellowships.create' => ['display_name_ar' => 'إنشاء الزمالات', 'display_name_en' => 'Create Fellowships'],
+            'fellowships.update' => ['display_name_ar' => 'تعديل الزمالات', 'display_name_en' => 'Update Fellowships'],
+            'fellowships.delete' => ['display_name_ar' => 'حذف الزمالات', 'display_name_en' => 'Delete Fellowships'],
+
+            'fellowship_questions.view' => ['display_name_ar' => 'عرض أسئلة الزمالات', 'display_name_en' => 'View Fellowship Questions'],
+            'fellowship_questions.create' => ['display_name_ar' => 'إنشاء أسئلة الزمالات', 'display_name_en' => 'Create Fellowship Questions'],
+            'fellowship_questions.update' => ['display_name_ar' => 'تعديل أسئلة الزمالات', 'display_name_en' => 'Update Fellowship Questions'],
+            'fellowship_questions.delete' => ['display_name_ar' => 'حذف أسئلة الزمالات', 'display_name_en' => 'Delete Fellowship Questions'],
+
+            'fellowship_filters.view' => ['display_name_ar' => 'عرض فلاتر الزمالات', 'display_name_en' => 'View Fellowship Filters'],
+            'fellowship_filters.create' => ['display_name_ar' => 'إنشاء فلاتر الزمالات', 'display_name_en' => 'Create Fellowship Filters'],
+            'fellowship_filters.update' => ['display_name_ar' => 'تعديل فلاتر الزمالات', 'display_name_en' => 'Update Fellowship Filters'],
+            'fellowship_filters.delete' => ['display_name_ar' => 'حذف فلاتر الزمالات', 'display_name_en' => 'Delete Fellowship Filters'],
+
             // Report cases — admin-authored case write-ups with their source PDF,
             // read by students. Its own permission family, like the rest of the
             // learning content.
@@ -151,6 +170,9 @@ class RolesPermissionsSeeder extends Seeder
             'book_pages.view',
             'quizzes.view',
             'questions.view',
+            'fellowships.view',
+            'fellowship_questions.view',
+            'fellowship_filters.view',
             // Report cases are the one learning entity the admin role manages
             // outright, not just reads.
             'report_cases.view',
@@ -199,6 +221,18 @@ class RolesPermissionsSeeder extends Seeder
             'questions.create',
             'questions.update',
             'questions.delete',
+            'fellowships.view',
+            'fellowships.create',
+            'fellowships.update',
+            'fellowships.delete',
+            'fellowship_questions.view',
+            'fellowship_questions.create',
+            'fellowship_questions.update',
+            'fellowship_questions.delete',
+            'fellowship_filters.view',
+            'fellowship_filters.create',
+            'fellowship_filters.update',
+            'fellowship_filters.delete',
             'report_cases.view',
             'report_cases.create',
             'report_cases.update',

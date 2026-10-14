@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Content\WebsiteContentDefinitions;
+use App\Contracts\Fellowship\SpreadsheetReader;
 use App\Contracts\PhoneVerificationProviderInterface;
 use App\Models\Admin;
 use App\Models\Blog;
@@ -14,6 +15,10 @@ use App\Models\ChapterPage;
 use App\Models\ContactMessage;
 use App\Models\Faq;
 use App\Models\FaqCategory;
+use App\Models\Fellowship;
+use App\Models\FellowshipFilter;
+use App\Models\FellowshipImport;
+use App\Models\FellowshipQuestion;
 use App\Models\Page;
 use App\Models\PageSection;
 use App\Models\PageSectionItem;
@@ -32,6 +37,10 @@ use App\Policies\ChapterPolicy;
 use App\Policies\ContactMessagePolicy;
 use App\Policies\FaqCategoryPolicy;
 use App\Policies\FaqPolicy;
+use App\Policies\FellowshipFilterPolicy;
+use App\Policies\FellowshipImportPolicy;
+use App\Policies\FellowshipPolicy;
+use App\Policies\FellowshipQuestionPolicy;
 use App\Policies\PagePolicy;
 use App\Policies\PageSectionItemPolicy;
 use App\Policies\PageSectionPolicy;
@@ -40,6 +49,7 @@ use App\Policies\QuestionPolicy;
 use App\Policies\QuizPolicy;
 use App\Policies\ReportCasePolicy;
 use App\Policies\SubjectPolicy;
+use App\Services\Fellowship\ExcelSpreadsheetReader;
 use App\Services\Phone\Providers\TwilioVerifyProvider;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -64,6 +74,10 @@ class AppServiceProvider extends ServiceProvider
                 default => throw new \InvalidArgumentException("Unknown phone verification provider: [{$provider}]."),
             };
         });
+
+        // The Fellowship importer's rules are what matter and are tested
+        // directly; which library opens the workbook is behind this binding.
+        $this->app->bind(SpreadsheetReader::class, ExcelSpreadsheetReader::class);
 
         $this->app->singleton(ContentDefinitionRegistry::class, function (): ContentDefinitionRegistry {
             $registry = new ContentDefinitionRegistry;
@@ -113,6 +127,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Question::class, QuestionPolicy::class);
         Gate::policy(QuestionOption::class, QuestionOptionPolicy::class);
         Gate::policy(ReportCase::class, ReportCasePolicy::class);
+        Gate::policy(Fellowship::class, FellowshipPolicy::class);
+        Gate::policy(FellowshipQuestion::class, FellowshipQuestionPolicy::class);
+        Gate::policy(FellowshipFilter::class, FellowshipFilterPolicy::class);
+        Gate::policy(FellowshipImport::class, FellowshipImportPolicy::class);
 
         Relation::enforceMorphMap([
             'user' => User::class,
@@ -130,6 +148,9 @@ class AppServiceProvider extends ServiceProvider
             'question' => Question::class,
             'question_option' => QuestionOption::class,
             'report_case' => ReportCase::class,
+            // Carries a media collection for its card image, so the morph map
+            // has to know it.
+            'fellowship' => Fellowship::class,
         ]);
     }
 }

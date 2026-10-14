@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The Fellowship suite, run against a real MySQL database.
+
+    WHY THIS FILE EXISTS
+
+    The default suite runs on SQLite in memory, which is right: it is fast, it
+    needs no setup, and that is what makes it worth running on every change.
+    What it cannot do is tell the truth about MySQL, and this module has already
+    been bitten twice by the difference.
+
+    SQLite accepts a GROUP BY or DISTINCT that carries an ORDER BY on a column it
+    neither groups nor selects. MySQL under ONLY_FULL_GROUP_BY refuses it
+    outright. Three queries here had that shape, every one green on SQLite and
+    broken on the first real request.
+
+    SQLite also stores a string longer than its column without complaint. MySQL
+    under STRICT_TRANS_TABLES refuses it with error 1406, so a row the SQLite
+    suite imports cleanly can fail on a real database. A dynamic filter value
+    over 255 characters is the case that found this, and staging now caps it at
+    FellowshipFilterValue::VALUE_MAX_LENGTH so the admin is told which column is
+    too long while the file is still on screen. That cap is what the SQLite
+    suite can check; that nothing else of the same kind is left is what running
+    here checks.
+
+    Those three queries are guarded by assertions on the SQL shape, in
+    FellowshipAnalyticsGroupingSqlTest and, for the import tally,
+    FellowshipImportSmokeTestFileTest. That is the right guard for a suite that
+    cannot execute against MySQL, and it is also the limit of one: a shape
+    assertion catches a regression in the pattern it already knows, never the
+    next incompatibility of a different kind. Executing the same tests where the
+    statements really run, under the production sql_mode, is what closes that.
+
+    This file changes nothing about the default suite. phpunit.xml is untouched
+    and still runs on SQLite; this is a second, narrower entry point. The exact
+    one-time setup and run commands are in the description of the companion
+    command, which `php artisan smoke:fellowship-import-integrity` names, and in
+    this project's review notes; the short of it is: create an empty
+    `zmedix_testing` database, migrate it once, then point `php artisan test` at
+    this config file.
+
+    RefreshDatabase migrates and transaction-wraps `zmedix_testing`, so no run
+    can reach the development database. The connection takes `strict` from
+    config/database.php, which is what puts ONLY_FULL_GROUP_BY and
+    STRICT_TRANS_TABLES on the session, and is the whole point of running here.
+
+    This does not replace smoke:fellowship-import-integrity. That command drives
+    the real import wizard against the development database and leaves its
+    records behind to be inspected; this is the ordinary suite, on MySQL.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <!-- Deliberately narrower than the default suite: the point is the one
+             module whose SQL is engine-sensitive, not a second full run. -->
+        <testsuite name="Fellowship">
+            <directory>tests/Feature/Fellowship</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <!-- Booting a Filament panel per Livewire test leaves the Fellowship
+             suites a few megabytes under PHP's 128M default. -->
+        <ini name="memory_limit" value="512M"/>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+
+        <!-- The one difference from phpunit.xml that matters: MySQL, and a
+             database of its own rather than the development one. Forced, so a
+             .env pointing elsewhere cannot leak in, and DB_URL is blanked for
+             the same reason since it would override everything below it. -->
+        <env name="DB_CONNECTION" value="mysql" force="true"/>
+        <env name="DB_DATABASE" value="zmedix_testing" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>
