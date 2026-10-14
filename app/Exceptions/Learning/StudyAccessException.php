@@ -63,4 +63,26 @@ class StudyAccessException extends StudyException
             Response::HTTP_NOT_FOUND,
         );
     }
+
+    public static function bookUnavailable(): self
+    {
+        return new self(
+            'This book is not available.',
+            'BOOK_UNAVAILABLE',
+            Response::HTTP_NOT_FOUND,
+        );
+    }
+
+    /**
+     * The book exists and is readable, but not in the form that was asked for:
+     * pages requested from a PDF book, or a PDF requested from a pages book.
+     */
+    public static function bookContentUnavailable(): self
+    {
+        return new self(
+            'This book has no content of that kind.',
+            'BOOK_CONTENT_UNAVAILABLE',
+            Response::HTTP_NOT_FOUND,
+        );
+    }
 }

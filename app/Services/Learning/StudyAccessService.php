@@ -3,6 +3,7 @@
 namespace App\Services\Learning;
 
 use App\Exceptions\Learning\StudyAccessException;
+use App\Models\Book;
 use App\Models\Chapter;
 use App\Models\ChapterPage;
 use App\Models\Quiz;
@@ -171,5 +172,93 @@ class StudyAccessService
         }
 
         return $chapters->last();
+    }
+
+    /**
+     * A platform book is reachable once it is published and its subject is.
+     *
+     * Books are not sequenced the way chapters are: they are reference material
+     * beside the chapter track, not steps through it, so reading one never
+     * depends on having completed anything.
+     */
+    public function canAccessBook(User $student, Book $book): bool
+    {
+        if (! $book->isPublished()) {
+            return false;
+        }
+
+        $subject = $book->subject;
+
+        return $subject instanceof Subject && $this->canAccessSubject($student, $subject);
+    }
+
+    public function assertCanAccessBook(User $student, Book $book): void
+    {
+        if (! $book->isPublished()) {
+            throw StudyAccessException::bookUnavailable();
+        }
+
+        $subject = $book->subject;
+
+        if (! $subject instanceof Subject || ! $this->canAccessSubject($student, $subject)) {
+            throw StudyAccessException::subjectUnavailable();
+        }
+    }
+
+    /**
+     * Every chapter this student may reach right now, as ids.
+     *
+     * The same rule {@see canAccessChapter()} applies to one chapter, decided
+     * for many at once: two queries rather than two per chapter. This is what
+     * lets the annotation collections filter in SQL and still agree exactly
+     * with what the per-page endpoints would allow — an unpublished subject, an
+     * unpublished chapter or a chapter whose predecessor is unfinished is absent
+     * from the result, so its annotations never surface in a collection the
+     * student could not reach the content of.
+     *
+     * Pass a subject to narrow it; omit it for every subject on the platform.
+     *
+     * @return array<int, int>
+     */
+    public function accessibleChapterIds(User $student, ?Subject $subject = null): array
+    {
+        $chapters = Chapter::query()
+            ->published()
+            ->whereHas('subject', fn ($query) => $query->published())
+            ->when(
+                $subject !== null,
+                fn ($query) => $query->where('subject_id', $subject->getKey()),
+            )
+            ->orderBy('subject_id')
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get(['id', 'subject_id']);
+
+        if ($chapters->isEmpty()) {
+            return [];
+        }
+
+        $completed = StudentChapterProgress::query()
+            ->where('user_id', $student->getKey())
+            ->whereIn('chapter_id', $chapters->pluck('id'))
+            ->pluck('chapter_id')
+            ->all();
+
+        $completed = array_flip($completed);
+
+        $accessible = [];
+        $previousBySubject = [];
+
+        foreach ($chapters as $chapter) {
+            $previous = $previousBySubject[$chapter->subject_id] ?? null;
+
+            if ($previous === null || isset($completed[$previous])) {
+                $accessible[] = (int) $chapter->id;
+            }
+
+            $previousBySubject[$chapter->subject_id] = (int) $chapter->id;
+        }
+
+        return $accessible;
     }
 }

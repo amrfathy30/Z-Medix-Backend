@@ -26,6 +26,7 @@ use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\Quiz;
 use App\Models\ReportCase;
+use App\Models\StudentPrivateBook;
 use App\Models\Subject;
 use App\Models\User;
 use App\Policies\BlogCategoryPolicy;
@@ -151,6 +152,9 @@ class AppServiceProvider extends ServiceProvider
             // Carries a media collection for its card image, so the morph map
             // has to know it.
             'fellowship' => Fellowship::class,
+            // Holds the student's own uploaded PDF on the private disk, so it
+            // owns media and has to be in the map too.
+            'student_private_book' => StudentPrivateBook::class,
         ]);
     }
 }

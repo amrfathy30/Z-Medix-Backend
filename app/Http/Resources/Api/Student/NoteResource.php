@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\Student;
 
+use App\Http\Resources\Api\Student\Concerns\HasAnnotationContext;
 use App\Models\StudentNote;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -14,6 +15,18 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class NoteResource extends JsonResource
 {
+    use HasAnnotationContext;
+
+    /**
+     * `$withContext` adds the chapter and subject the annotation sits in, for
+     * the collection screen that lists them away from their page. Off by
+     * default, so the per-page payload is unchanged.
+     */
+    public function __construct($resource, private bool $withContext = false)
+    {
+        parent::__construct($resource);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -26,6 +39,7 @@ class NoteResource extends JsonResource
             'content' => $this->content,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            ...$this->withContext ? ['context' => $this->annotationContext()] : [],
         ];
     }
 }
