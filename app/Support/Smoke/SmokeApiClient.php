@@ -62,6 +62,15 @@ class SmokeApiClient
      */
     private function send(string $method, string $uri, array $payload = []): SmokeApiResponse
     {
+        // Each request must authenticate from its own headers.
+        //
+        // Guards resolve their user once and remember it, which is right for a
+        // real request — one process, one request — but wrong here, where many
+        // requests share a process. Without this, a run that authenticates as a
+        // second student keeps being served as the first, and an ownership check
+        // would pass for the wrong reason.
+        app('auth')->forgetGuards();
+
         $request = Request::create(
             uri: $uri,
             method: $method,
