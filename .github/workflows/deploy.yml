@@ -55,6 +55,11 @@ jobs:
             # reseeding when the countries table is already populated.
             php artisan db:seed --class=WorldSeeder --force
 
+            # Seed the demo Fellowship question banks.
+            # FellowshipSeeder is idempotent and refuses to run when
+            # APP_ENV=production.
+            php artisan db:seed --class=FellowshipSeeder --force
+
             # public/storage is git-ignored, so it must be recreated
             # on the server or uploaded files may return 403.
             php artisan storage:link --force
