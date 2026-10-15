@@ -63,6 +63,109 @@ class SubjectDiscoveryTest extends StudyTestCase
             ->assertJsonPath('data.0.chapters.percentage', 33.33);
     }
 
+    public function test_the_listing_can_be_searched_by_subject_name(): void
+    {
+        Subject::factory()->create(['name' => 'Cardiology']);
+        $anatomy = Subject::factory()->create(['name' => 'Gross Anatomy']);
+        Subject::factory()->create(['name' => 'Anatomy of the Heart']);
+        Subject::factory()->draft()->create(['name' => 'Anatomy Draft']);
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl.'/subjects?search=anatomy')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('data.0.name', 'Anatomy of the Heart')
+            ->assertJsonPath('data.1.id', $anatomy->id);
+
+        $this->getJson($this->studyUrl.'/subjects?search=nothing-matches')
+            ->assertOk()
+            ->assertJsonCount(0, 'data')
+            ->assertJsonPath('meta.total', 0);
+
+        // No search term is no filter.
+        $this->getJson($this->studyUrl.'/subjects?search=')
+            ->assertOk()
+            ->assertJsonCount(3, 'data');
+    }
+
+    public function test_the_search_term_is_kept_in_the_pagination_links(): void
+    {
+        Subject::factory()->count(3)->sequence(
+            ['name' => 'Anatomy A'],
+            ['name' => 'Anatomy B'],
+            ['name' => 'Anatomy C'],
+        )->create();
+
+        Sanctum::actingAs($this->student());
+
+        $next = $this->getJson($this->studyUrl.'/subjects?search=anatomy&per_page=2')
+            ->assertOk()
+            ->json('links.next');
+
+        $this->assertStringContainsString('search=anatomy', $next);
+    }
+
+    public function test_an_overlong_search_term_is_rejected(): void
+    {
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl.'/subjects?search='.str_repeat('a', 101))
+            ->assertUnprocessable();
+    }
+
+    public function test_each_listed_subject_names_the_chapter_the_student_is_on(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 3, pages: 1);
+        [$first, $second, $third] = $subject->chapters()->get()->all();
+        $empty = Subject::factory()->create(['name' => 'Zzz Empty']);
+
+        Sanctum::actingAs($student = $this->student());
+
+        // Nothing completed: the first chapter.
+        $this->getJson($this->studyUrl.'/subjects')
+            ->assertOk()
+            ->assertJsonPath('data.0.current_chapter.id', $first->id)
+            ->assertJsonPath('data.0.current_chapter.title', $first->title)
+            ->assertJsonPath('data.0.current_chapter.order', $first->order)
+            // No published chapters, so nowhere to be.
+            ->assertJsonPath('data.1.id', $empty->id)
+            ->assertJsonPath('data.1.current_chapter', null);
+
+        $this->completeChapter($student, $first);
+
+        $this->getJson($this->studyUrl.'/subjects')
+            ->assertJsonPath('data.0.current_chapter.id', $second->id);
+
+        $this->completeChapter($student, $second);
+        $this->completeChapter($student, $third);
+
+        // The whole track done: it stays on the last chapter.
+        $this->getJson($this->studyUrl.'/subjects')
+            ->assertJsonPath('data.0.current_chapter.id', $third->id);
+    }
+
+    public function test_the_current_chapter_skips_drafts_and_is_per_student(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 3, pages: 1);
+        [$first, $second, $third] = $subject->chapters()->get()->all();
+        $second->update(['status' => ContentStatus::Draft]);
+
+        Sanctum::actingAs($student = $this->student());
+        $this->completeChapter($student, $first);
+
+        // The draft is not part of the track, so the next one is the third.
+        $this->getJson($this->studyUrl.'/subjects')
+            ->assertJsonPath('data.0.current_chapter.id', $third->id);
+
+        // Another student's progress is theirs alone.
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl.'/subjects')
+            ->assertJsonPath('data.0.current_chapter.id', $first->id);
+    }
+
     public function test_subject_details_carry_chapters_and_books_side_by_side(): void
     {
         $subject = $this->subjectWithChapters(chapters: 2, pages: 2);
