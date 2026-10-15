@@ -3,6 +3,7 @@
 namespace Tests\Feature\Study;
 
 use App\Enums\ContentStatus;
+use App\Enums\QuizAttemptStatus;
 use App\Models\Book;
 use App\Models\Chapter;
 use App\Models\Subject;
@@ -83,6 +84,116 @@ class SubjectDiscoveryTest extends StudyTestCase
             ->assertJsonPath('data.books.0.author', 'A. Author')
             // Books are not nested inside a chapter, and never will be.
             ->assertJsonMissingPath('data.chapters.0.books');
+    }
+
+    public function test_subject_details_carry_the_description(): void
+    {
+        $subject = Subject::factory()->create(['description' => 'The heart and blood vessels.']);
+        $bare = Subject::factory()->create();
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonPath('data.description', 'The heart and blood vessels.');
+
+        // Subjects authored before the field existed have none.
+        $this->getJson($this->studyUrl."/subjects/{$bare->id}")
+            ->assertOk()
+            ->assertJsonPath('data.description', null);
+    }
+
+    public function test_subject_details_list_the_chapter_quizzes_in_track_order(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 2, pages: 1, questions: 3);
+        [$first, $second] = $subject->chapters()->get()->all();
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonCount(2, 'data.quizzes')
+            ->assertJsonPath('data.quizzes.0.id', $first->quiz->id)
+            ->assertJsonPath('data.quizzes.0.chapter_id', $first->id)
+            ->assertJsonPath('data.quizzes.0.chapter_title', $first->title)
+            ->assertJsonPath('data.quizzes.0.title', $first->quiz->title)
+            ->assertJsonPath('data.quizzes.0.difficulty', $first->quiz->difficulty->value)
+            ->assertJsonPath('data.quizzes.0.question_count', 3)
+            ->assertJsonPath('data.quizzes.0.attempts_count', 0)
+            ->assertJsonPath('data.quizzes.0.last_attempt', null)
+            // A quiz is as reachable as its chapter.
+            ->assertJsonPath('data.quizzes.0.is_accessible', true)
+            ->assertJsonPath('data.quizzes.1.chapter_id', $second->id)
+            ->assertJsonPath('data.quizzes.1.is_accessible', false);
+    }
+
+    public function test_a_quiz_row_reports_the_students_latest_attempt(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1, pages: 1, questions: 2);
+        $chapter = $subject->chapters()->first();
+
+        Sanctum::actingAs($student = $this->student());
+
+        $finished = $this->startQuiz($chapter);
+        $this->answerAllCorrectly($finished['id']);
+
+        $open = $this->startQuiz($chapter);
+        $this->assertNotSame($finished['id'], $open['id']);
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonPath('data.quizzes.0.attempts_count', 2)
+            ->assertJsonPath('data.quizzes.0.last_attempt.id', $open['id'])
+            ->assertJsonPath('data.quizzes.0.last_attempt.status', QuizAttemptStatus::InProgress->value)
+            ->assertJsonPath('data.quizzes.0.last_attempt.percentage', 0);
+    }
+
+    public function test_a_quiz_row_scores_the_latest_attempt_like_its_history_row(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1, pages: 1, questions: 4);
+        $chapter = $subject->chapters()->first();
+
+        Sanctum::actingAs($this->student());
+
+        $attempt = $this->startQuiz($chapter);
+        $this->answerAllCorrectly($attempt['id']);
+
+        $percentage = $this->getJson($this->studyUrl."/chapters/{$chapter->id}/quiz/attempts")
+            ->json('data.0.percentage');
+
+        $this->assertSame(100.0, (float) $percentage);
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertJsonPath('data.quizzes.0.last_attempt.status', QuizAttemptStatus::Completed->value)
+            ->assertJsonPath('data.quizzes.0.last_attempt.percentage', $percentage);
+    }
+
+    public function test_another_students_attempts_do_not_show_on_a_quiz_row(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1, pages: 1, questions: 2);
+        $chapter = $subject->chapters()->first();
+
+        Sanctum::actingAs($this->student());
+        $this->startQuiz($chapter);
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonPath('data.quizzes.0.attempts_count', 0)
+            ->assertJsonPath('data.quizzes.0.last_attempt', null);
+    }
+
+    public function test_unpublished_chapters_quizzes_are_not_listed(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 2, pages: 1);
+        $subject->chapters()->get()->last()->update(['status' => ContentStatus::Draft]);
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.quizzes');
     }
 
     public function test_the_chapter_track_reports_lock_and_completion_state(): void
