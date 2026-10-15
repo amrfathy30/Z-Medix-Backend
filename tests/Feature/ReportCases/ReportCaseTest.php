@@ -321,6 +321,74 @@ class ReportCaseTest extends TestCase
         $this->assertStringContainsString('case.pdf', $pdfUrl);
     }
 
+    public function test_a_student_can_search_report_cases(): void
+    {
+        $byTitle = ReportCase::factory()->create(['title' => 'Acute Appendicitis', 'description' => 'x', 'source' => 'y']);
+        $byDescription = ReportCase::factory()->create(['title' => 'Case B', 'description' => 'Pain in the appendix region', 'source' => 'y']);
+        $bySource = ReportCase::factory()->create(['title' => 'Case C', 'description' => 'x', 'source' => 'Appendicitis Journal']);
+        ReportCase::factory()->create(['title' => 'Heart Failure', 'description' => 'x', 'source' => 'y']);
+
+        Sanctum::actingAs($this->student());
+
+        $ids = collect($this->getJson($this->studentUrl.'?search=appendi')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 3)
+            ->json('data'))->pluck('id');
+
+        $this->assertEqualsCanonicalizing(
+            [$byTitle->id, $byDescription->id, $bySource->id],
+            $ids->all(),
+        );
+
+        $this->getJson($this->studentUrl.'?search=nothing-matches')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        // No search term is no filter.
+        $this->getJson($this->studentUrl.'?search=')
+            ->assertOk()
+            ->assertJsonCount(4, 'data');
+    }
+
+    public function test_searching_never_reveals_an_inactive_report_case(): void
+    {
+        ReportCase::factory()->create(['title' => 'Active Appendicitis']);
+        $hidden = ReportCase::factory()->inactive()->create([
+            'title' => 'Hidden Appendicitis',
+            'description' => 'appendicitis',
+            'source' => 'appendicitis',
+        ]);
+
+        Sanctum::actingAs($this->student());
+
+        $ids = collect($this->getJson($this->studentUrl.'?search=appendicitis')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->json('data'))->pluck('id');
+
+        $this->assertFalse($ids->contains($hidden->id));
+    }
+
+    public function test_the_search_term_is_kept_in_the_pagination_links_and_bounded(): void
+    {
+        ReportCase::factory()->count(3)->sequence(
+            ['title' => 'Appendicitis A'],
+            ['title' => 'Appendicitis B'],
+            ['title' => 'Appendicitis C'],
+        )->create();
+
+        Sanctum::actingAs($this->student());
+
+        $next = $this->getJson($this->studentUrl.'?search=appendicitis&per_page=2')
+            ->assertOk()
+            ->json('links.next');
+
+        $this->assertStringContainsString('search=appendicitis', $next);
+
+        $this->getJson($this->studentUrl.'?search='.str_repeat('a', 101))
+            ->assertUnprocessable();
+    }
+
     public function test_the_student_endpoint_rejects_a_guest(): void
     {
         ReportCase::factory()->create();

@@ -46,32 +46,46 @@ class SubjectController extends Controller
     ) {}
 
     /**
-     * Every subject the student may study, with how far through each they are.
+     * Every subject the student may study, with how far through each they are
+     * and the chapter they are on.
+     *
+     * `search` narrows the list to subjects whose name contains it.
      *
      * The chapter and book counts come from `withCount`, and the completion
-     * figures from one aggregate across the whole page, so the cost does not
-     * grow with the number of subjects listed.
+     * and current-chapter figures from one aggregate each across the whole
+     * page, so the cost does not grow with the number of subjects listed.
      */
     public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
         $perPage = min(max((int) $request->integer('per_page', 15), 1), 50);
 
         $subjects = Subject::query()
             ->published()
+            ->when(
+                $request->filled('search'),
+                fn ($query) => $query->where('name', 'LIKE', '%'.$request->string('search')->toString().'%'),
+            )
             ->withCount(['publishedChapters', 'publishedBooks'])
             ->orderBy('name')
             ->orderBy('id')
-            ->paginate($perPage);
+            ->paginate($perPage)
+            ->withQueryString();
 
-        $completed = $this->completedChaptersBySubject(
-            $request->user()->getKey(),
-            $subjects->getCollection()->pluck('id')->all(),
-        );
+        $subjectIds = $subjects->getCollection()->pluck('id')->all();
+        $studentId = $request->user()->getKey();
+
+        $completed = $this->completedChaptersBySubject($studentId, $subjectIds);
+        $current = $this->currentChapterBySubject($studentId, $subjectIds);
 
         $subjects->getCollection()->transform(
             fn (Subject $subject): SubjectListItemResource => new SubjectListItemResource(
                 $subject,
                 (int) ($completed[$subject->getKey()] ?? 0),
+                $current[$subject->getKey()] ?? null,
             ),
         );
 
@@ -230,6 +244,50 @@ class SubjectController extends Controller
             ->groupBy('chapters.subject_id')
             ->selectRaw('chapters.subject_id as subject_id, count(*) as completed')
             ->pluck('completed', 'subject_id');
+    }
+
+    /**
+     * The chapter the student is on in each of a page of subjects, keyed by
+     * subject id: the first published chapter they have not completed, or the
+     * last one once the whole subject is done. Subjects with no published
+     * chapters are absent.
+     *
+     * The same rule as {@see StudyAccessService::currentAccessibleChapter()},
+     * answered for the whole page in two queries instead of two per subject.
+     *
+     * @param  array<int, int>  $subjectIds
+     * @return array<int, Chapter>
+     */
+    private function currentChapterBySubject(int $studentId, array $subjectIds): array
+    {
+        if ($subjectIds === []) {
+            return [];
+        }
+
+        $chapters = Chapter::query()
+            ->published()
+            ->whereIn('subject_id', $subjectIds)
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get(['id', 'subject_id', 'title', 'order']);
+
+        $completed = array_flip(
+            StudentChapterProgress::query()
+                ->where('user_id', $studentId)
+                ->whereIn('chapter_id', $chapters->pluck('id'))
+                ->pluck('chapter_id')
+                ->all(),
+        );
+
+        $current = [];
+
+        foreach ($chapters->groupBy('subject_id') as $subjectId => $track) {
+            $current[$subjectId] = $track->first(
+                fn (Chapter $chapter): bool => ! isset($completed[$chapter->getKey()]),
+            ) ?? $track->last();
+        }
+
+        return $current;
     }
 
     /**
