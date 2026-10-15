@@ -19,6 +19,7 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -77,6 +78,11 @@ class SubjectResource extends Resource
                             ->options(self::statusOptions())
                             ->required()
                             ->default(ContentStatus::Draft->value),
+                        Textarea::make('description')
+                            ->label(__('admin.learning.field_subject_description'))
+                            ->rows(4)
+                            ->maxLength(1000)
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
 

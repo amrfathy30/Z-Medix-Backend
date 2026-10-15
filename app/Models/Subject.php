@@ -20,6 +20,7 @@ class Subject extends Model implements HasMedia
 
     protected $fillable = [
         'name',
+        'description',
         'status',
     ];
 

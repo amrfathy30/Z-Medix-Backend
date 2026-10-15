@@ -371,6 +371,7 @@ return [
         'subject_section_image' => 'صورة المادة',
         'subject_section_overview' => 'نظرة عامة على المادة',
         'field_subject_name' => 'الاسم',
+        'field_subject_description' => 'الوصف',
         'field_subject_image' => 'الصورة',
         'field_status' => 'الحالة',
         'field_chapters_count' => 'الفصول',

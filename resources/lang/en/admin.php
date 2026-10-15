@@ -371,6 +371,7 @@ return [
         'subject_section_image' => 'Subject Image',
         'subject_section_overview' => 'Subject Overview',
         'field_subject_name' => 'Name',
+        'field_subject_description' => 'Description',
         'field_subject_image' => 'Image',
         'field_status' => 'Status',
         'field_chapters_count' => 'Chapters',
