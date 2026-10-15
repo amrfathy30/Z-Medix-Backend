@@ -8,13 +8,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\Student\SubjectDetailsResource;
 use App\Http\Resources\Api\Student\SubjectListItemResource;
 use App\Models\Chapter;
+use App\Models\QuizAttempt;
 use App\Models\StudentChapterPageProgress;
 use App\Models\StudentChapterProgress;
 use App\Models\Subject;
+use App\Services\Learning\QuizAttemptService;
 use App\Services\Learning\StudyAccessService;
 use App\Services\Learning\SubjectAnalyticsService;
 use App\Support\Api\ApiResponse;
 use App\Support\Api\HandlesStudyExceptions;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,6 +42,7 @@ class SubjectController extends Controller
     public function __construct(
         private StudyAccessService $access,
         private SubjectAnalyticsService $analytics,
+        private QuizAttemptService $attempts,
     ) {}
 
     /**
@@ -75,7 +79,8 @@ class SubjectController extends Controller
     }
 
     /**
-     * One subject: its chapter track with each chapter's state, and its books.
+     * One subject: its chapter track with each chapter's state, its chapter
+     * quizzes, and its books.
      *
      * `is_accessible` is the backend's own answer to whether the student may
      * open a chapter yet, decided by the same rule the chapter endpoint
@@ -93,7 +98,10 @@ class SubjectController extends Controller
         }
 
         /** @var Collection<int, Chapter> $chapters */
-        $chapters = $subject->publishedChapters()->withCount('pages')->get();
+        $chapters = $subject->publishedChapters()
+            ->withCount('pages')
+            ->with(['quiz' => fn ($query) => $query->withCount('questions')])
+            ->get();
 
         $subject->setRelation(
             'publishedBooks',
@@ -126,9 +134,79 @@ class SubjectController extends Controller
         return $this->successResponse(new SubjectDetailsResource(
             $subject,
             $rows,
+            $this->quizRows($student->getKey(), $chapters, $accessibleIds),
             $this->analytics->chapterProgress($student, $subject),
             $this->analytics->readingProgress($student, $subject),
         ));
+    }
+
+    /**
+     * The subject's chapter quizzes in track order, each with how far this
+     * student has got with it.
+     *
+     * A quiz is reachable exactly when its chapter is, so `is_accessible` is
+     * the chapter's own answer. The latest attempt is scored through
+     * {@see QuizAttemptService::tallyFromCounts()}, the same formula the
+     * attempt history uses, so a row here matches the attempt it points at.
+     * Attempt figures come from two queries for the whole subject.
+     *
+     * @param  Collection<int, Chapter>  $chapters
+     * @param  array<int, int>  $accessibleIds
+     * @return list<array<string, mixed>>
+     */
+    private function quizRows(int $studentId, Collection $chapters, array $accessibleIds): array
+    {
+        $withQuiz = $chapters->filter(fn (Chapter $chapter): bool => $chapter->quiz !== null);
+
+        if ($withQuiz->isEmpty()) {
+            return [];
+        }
+
+        $summaries = QuizAttempt::query()
+            ->where('user_id', $studentId)
+            ->whereIn('quiz_id', $withQuiz->map(fn (Chapter $chapter): int => $chapter->quiz->getKey())->all())
+            ->groupBy('quiz_id')
+            ->selectRaw('quiz_id, count(*) as attempts, max(id) as latest_id')
+            ->get()
+            ->keyBy('quiz_id');
+
+        $latest = $summaries->isEmpty() ? collect() : QuizAttempt::query()
+            ->whereIn('id', $summaries->pluck('latest_id'))
+            ->withCount([
+                'questions as questions_total',
+                'questions as questions_answered' => fn (Builder $query) => $query->whereNotNull('answered_at'),
+                'questions as questions_correct' => fn (Builder $query) => $query
+                    ->whereNotNull('answered_at')
+                    ->where('is_correct', true),
+            ])
+            ->get()
+            ->keyBy('quiz_id');
+
+        return $withQuiz->map(function (Chapter $chapter) use ($summaries, $latest, $accessibleIds): array {
+            $quiz = $chapter->quiz;
+            /** @var QuizAttempt|null $attempt */
+            $attempt = $latest->get($quiz->getKey());
+
+            return [
+                'id' => $quiz->getKey(),
+                'chapter_id' => $chapter->getKey(),
+                'chapter_title' => $chapter->title,
+                'title' => $quiz->title,
+                'difficulty' => $quiz->difficulty?->value,
+                'question_count' => (int) $quiz->questions_count,
+                'is_accessible' => isset($accessibleIds[$chapter->getKey()]),
+                'attempts_count' => (int) ($summaries->get($quiz->getKey())?->attempts ?? 0),
+                'last_attempt' => $attempt === null ? null : [
+                    'id' => $attempt->getKey(),
+                    'status' => $attempt->status?->value,
+                    'percentage' => $this->attempts->tallyFromCounts(
+                        (int) $attempt->questions_total,
+                        (int) $attempt->questions_answered,
+                        (int) $attempt->questions_correct,
+                    )['percentage'],
+                ],
+            ];
+        })->values()->all();
     }
 
     /**

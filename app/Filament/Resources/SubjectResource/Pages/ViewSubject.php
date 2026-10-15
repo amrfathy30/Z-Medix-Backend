@@ -119,6 +119,10 @@ class ViewSubject extends ViewRecord
                             ->height(96),
                         TextEntry::make('name')
                             ->label(__('admin.learning.field_subject_name')),
+                        TextEntry::make('description')
+                            ->label(__('admin.learning.field_subject_description'))
+                            ->placeholder('—')
+                            ->columnSpanFull(),
                         TextEntry::make('status')
                             ->label(__('admin.learning.field_status'))
                             ->badge()
