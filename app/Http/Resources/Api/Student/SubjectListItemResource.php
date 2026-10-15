@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\Student;
 
+use App\Models\Chapter;
 use App\Models\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -9,6 +10,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * A subject as the Subjects screen lists it: what it holds, and how far the
  * student has got through it.
+ *
+ * `current_chapter` is the chapter the student is on: the first one they have
+ * not completed, or the last once they have finished them all. Null for a
+ * subject with no published chapters.
  *
  * The counts come from `withCount` on the listing query and the completion
  * figure from one aggregate over the whole page of subjects, so a list of any
@@ -18,8 +23,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class SubjectListItemResource extends JsonResource
 {
-    public function __construct($resource, private int $completedChapters = 0)
-    {
+    public function __construct(
+        $resource,
+        private int $completedChapters = 0,
+        private ?Chapter $currentChapter = null,
+    ) {
         parent::__construct($resource);
     }
 
@@ -36,6 +44,11 @@ class SubjectListItemResource extends JsonResource
             'image' => $this->imageUrl(),
             'chapters_count' => $totalChapters,
             'books_count' => (int) ($this->published_books_count ?? 0),
+            'current_chapter' => $this->currentChapter === null ? null : [
+                'id' => $this->currentChapter->getKey(),
+                'title' => $this->currentChapter->title,
+                'order' => $this->currentChapter->order,
+            ],
             'chapters' => [
                 'completed_chapters' => $this->completedChapters,
                 'total_chapters' => $totalChapters,
