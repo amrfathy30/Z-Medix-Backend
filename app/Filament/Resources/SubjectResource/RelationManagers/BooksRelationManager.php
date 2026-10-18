@@ -67,10 +67,16 @@ class BooksRelationManager extends RelationManager
                     ->schema([
                         BookResource::titleField(),
                         BookResource::authorField(),
+                        BookResource::classificationField(),
                         BookResource::typeField(),
                         BookResource::statusField(),
                     ])
                     ->columns(2),
+
+                Section::make(__('admin.learning.book_section_cover'))
+                    ->schema([
+                        BookResource::coverField(),
+                    ]),
 
                 Section::make(__('admin.learning.book_section_pdf'))
                     ->visible(fn (Get $get): bool => $get('type') === BookType::Pdf->value)
@@ -84,6 +90,7 @@ class BooksRelationManager extends RelationManager
                                 'size' => (int) round(BookResource::pdfMaxSizeKb() / 1024),
                             ]))
                             ->columnSpanFull(),
+                        BookResource::totalPagesField(),
                     ]),
             ]);
     }
@@ -153,8 +160,12 @@ class BooksRelationManager extends RelationManager
                         return $books->create($subject, [
                             'title' => $data['title'] ?? null,
                             'author' => $data['author'] ?? null,
+                            'classification' => $data['classification'] ?? null,
                             'type' => $data['type'] ?? null,
                             'status' => $data['status'] ?? null,
+                            // Only ever filled for a PDF book: the section it
+                            // sits in is gated on the type.
+                            'total_pages' => $data['total_pages'] ?? null,
                         ]);
                     }),
             ])
