@@ -28,6 +28,17 @@ return [
         'image/svg+xml',
     ],
 
+    /*
+     * Book cover images. Narrower than 'image_mime_types' on purpose: a cover
+     * is rendered as a thumbnail in the student app, so the vector type the
+     * wider list allows is not accepted here.
+     */
+    'cover_image_mime_types' => [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+    ],
+
     'document_mime_types' => [
         'application/pdf',
     ],

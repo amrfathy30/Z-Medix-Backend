@@ -49,6 +49,7 @@ class BookController extends Controller
 
         $books = $subject->publishedBooks()
             ->withCount('pages')
+            ->with('media')
             ->paginate($perPage);
 
         return $this->paginatedResponse(BookListItemResource::collection($books));

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\Student;
 
 use App\Enums\ContentStatus;
+use App\Enums\QuizAttemptStatus;
+use App\Enums\StudyProgressStatus;
 use App\Exceptions\Learning\StudyException;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\Student\SubjectDetailsResource;
@@ -119,28 +121,54 @@ class SubjectController extends Controller
 
         $subject->setRelation(
             'publishedBooks',
-            $subject->publishedBooks()->withCount('pages')->get(),
+            // `media` carries the cover and the PDF, so it is loaded for the
+            // whole list rather than read per book.
+            $subject->publishedBooks()->withCount('pages')->with('media')->get(),
         );
 
         $accessibleIds = array_flip($this->access->accessibleChapterIds($student, $subject));
         $completedIds = array_flip($this->completedChapterIds($student->getKey(), $chapters));
         $pagesRead = $this->pagesReadByChapter($student->getKey(), $chapters);
 
-        $rows = $chapters->map(function (Chapter $chapter) use ($accessibleIds, $completedIds, $pagesRead): array {
+        $quizzes = $this->quizRows($student->getKey(), $chapters, $accessibleIds);
+
+        // Which chapters the student has already touched through their quiz,
+        // taken from the rows just built rather than queried again.
+        $attempted = [];
+
+        foreach ($quizzes as $quiz) {
+            if ($quiz['attempts_count'] > 0) {
+                $attempted[$quiz['chapter_id']] = true;
+            }
+        }
+
+        $rows = $chapters->map(function (Chapter $chapter) use ($accessibleIds, $completedIds, $pagesRead, $attempted): array {
             $totalPages = (int) ($chapter->pages_count ?? 0);
             $readPages = (int) ($pagesRead[$chapter->getKey()] ?? 0);
+            $percentage = $totalPages === 0 ? 0.0 : round($readPages / $totalPages * 100, 2);
+            $isCompleted = isset($completedIds[$chapter->getKey()]);
 
             return [
                 'id' => $chapter->getKey(),
                 'title' => $chapter->title,
                 'references' => $chapter->references,
                 'order' => (int) $chapter->order,
-                'is_completed' => isset($completedIds[$chapter->getKey()]),
+                'is_completed' => $isCompleted,
                 'is_accessible' => isset($accessibleIds[$chapter->getKey()]),
+                // The chapter's own figure, repeated flat beside the reading
+                // breakdown the clients already read.
+                'progress_percentage' => $percentage,
+                'status' => StudyProgressStatus::decide(
+                    isAccessible: isset($accessibleIds[$chapter->getKey()]),
+                    isCompleted: $isCompleted,
+                    // Started means they have read a page of it or entered its
+                    // quiz, which is every way into a chapter there is.
+                    hasStarted: $readPages > 0 || isset($attempted[$chapter->getKey()]),
+                )->value,
                 'reading_progress' => [
                     'completed_pages' => $readPages,
                     'total_pages' => $totalPages,
-                    'percentage' => $totalPages === 0 ? 0.0 : round($readPages / $totalPages * 100, 2),
+                    'percentage' => $percentage,
                 ],
             ];
         })->values()->all();
@@ -148,9 +176,10 @@ class SubjectController extends Controller
         return $this->successResponse(new SubjectDetailsResource(
             $subject,
             $rows,
-            $this->quizRows($student->getKey(), $chapters, $accessibleIds),
+            $quizzes,
             $this->analytics->chapterProgress($student, $subject),
             $this->analytics->readingProgress($student, $subject),
+            $this->analytics->subjectStats($student, $subject),
         ));
     }
 
@@ -180,7 +209,12 @@ class SubjectController extends Controller
             ->where('user_id', $studentId)
             ->whereIn('quiz_id', $withQuiz->map(fn (Chapter $chapter): int => $chapter->quiz->getKey())->all())
             ->groupBy('quiz_id')
-            ->selectRaw('quiz_id, count(*) as attempts, max(id) as latest_id')
+            ->selectRaw(implode(', ', [
+                'quiz_id',
+                'count(*) as attempts',
+                'max(id) as latest_id',
+                "sum(case when status = '".QuizAttemptStatus::Completed->value."' then 1 else 0 end) as completed_attempts",
+            ]))
             ->get()
             ->keyBy('quiz_id');
 
@@ -200,6 +234,16 @@ class SubjectController extends Controller
             $quiz = $chapter->quiz;
             /** @var QuizAttempt|null $attempt */
             $attempt = $latest->get($quiz->getKey());
+            $summary = $summaries->get($quiz->getKey());
+            $isAccessible = isset($accessibleIds[$chapter->getKey()]);
+
+            $tally = $attempt === null ? null : $this->attempts->tallyFromCounts(
+                (int) $attempt->questions_total,
+                (int) $attempt->questions_answered,
+                (int) $attempt->questions_correct,
+            );
+
+            $inProgress = $attempt?->status === QuizAttemptStatus::InProgress;
 
             return [
                 'id' => $quiz->getKey(),
@@ -208,19 +252,45 @@ class SubjectController extends Controller
                 'title' => $quiz->title,
                 'difficulty' => $quiz->difficulty?->value,
                 'question_count' => (int) $quiz->questions_count,
-                'is_accessible' => isset($accessibleIds[$chapter->getKey()]),
-                'attempts_count' => (int) ($summaries->get($quiz->getKey())?->attempts ?? 0),
+                'is_accessible' => $isAccessible,
+                'attempts_count' => (int) ($summary?->attempts ?? 0),
+                // Decided from the latest attempt, so a quiz the student has
+                // finished once and re-entered reads as in progress again —
+                // which is the attempt they would resume.
+                'status' => StudyProgressStatus::decide(
+                    isAccessible: $isAccessible,
+                    isCompleted: ! $inProgress && (int) ($summary?->completed_attempts ?? 0) > 0,
+                    hasStarted: $inProgress,
+                )->value,
+                // How far through the latest attempt they are: answered over
+                // that attempt's own questions, zero before they start one.
+                'progress_percentage' => $attempt === null ? 0.0 : $this->percentage(
+                    (int) $attempt->questions_answered,
+                    (int) $attempt->questions_total,
+                ),
+                // Correct over confirmed answers of the latest attempt — the
+                // same rule every other score in the module uses. Null until
+                // they have confirmed an answer, never zero.
+                'latest_score' => $tally['average_score'] ?? null,
                 'last_attempt' => $attempt === null ? null : [
                     'id' => $attempt->getKey(),
                     'status' => $attempt->status?->value,
-                    'percentage' => $this->attempts->tallyFromCounts(
-                        (int) $attempt->questions_total,
-                        (int) $attempt->questions_answered,
-                        (int) $attempt->questions_correct,
-                    )['percentage'],
+                    'percentage' => $tally['percentage'],
                 ],
             ];
         })->values()->all();
+    }
+
+    /**
+     * Rounded the same way every other score in the module is.
+     */
+    private function percentage(int $part, int $whole): float
+    {
+        if ($whole === 0) {
+            return 0.0;
+        }
+
+        return round($part / $whole * 100, 2);
     }
 
     /**

@@ -30,10 +30,14 @@ class Book extends Model implements HasMedia
 
     public const PDF_COLLECTION = 'book_pdf';
 
+    public const COVER_COLLECTION = 'book_cover';
+
     protected $fillable = [
         'subject_id',
         'title',
         'author',
+        'classification',
+        'total_pages',
         'type',
         'status',
         'order',
@@ -45,6 +49,7 @@ class Book extends Model implements HasMedia
             'type' => BookType::class,
             'status' => ContentStatus::class,
             'order' => 'integer',
+            'total_pages' => 'integer',
         ];
     }
 
@@ -81,6 +86,13 @@ class Book extends Model implements HasMedia
         $this->addMediaCollection(self::PDF_COLLECTION)
             ->useDisk('filament_public')
             ->acceptsMimeTypes(config('media.document_mime_types', []))
+            ->singleFile();
+
+        // The book's cover, independent of its material: a book of either type
+        // may carry one, and it never affects the type lock above.
+        $this->addMediaCollection(self::COVER_COLLECTION)
+            ->useDisk('filament_public')
+            ->acceptsMimeTypes(config('media.cover_image_mime_types', []))
             ->singleFile();
     }
 
@@ -132,6 +144,34 @@ class Book extends Model implements HasMedia
     public function pdfFileName(): ?string
     {
         return $this->getFirstMedia(self::PDF_COLLECTION)?->file_name;
+    }
+
+    public function hasCover(): bool
+    {
+        return $this->getFirstMedia(self::COVER_COLLECTION) instanceof Media;
+    }
+
+    /**
+     * Resolved public URL of the cover image, or null when none is uploaded.
+     */
+    public function coverUrl(): ?string
+    {
+        return app(MediaUploadService::class)->getUrl($this, self::COVER_COLLECTION);
+    }
+
+    /**
+     * How many pages the book has, whichever kind it is.
+     *
+     * A content book is counted from its page rows. A PDF book keeps its
+     * material in one file that nothing here parses, so its figure is the one
+     * the admin typed, and null until they do — never a zero, which would claim
+     * an empty book.
+     */
+    public function totalPages(): ?int
+    {
+        return $this->isContent()
+            ? (int) ($this->pages_count ?? $this->pagesCount())
+            : $this->total_pages;
     }
 
     /**
