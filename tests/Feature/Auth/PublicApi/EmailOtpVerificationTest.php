@@ -47,6 +47,21 @@ class EmailOtpVerificationTest extends TestCase
         Event::assertDispatched(Verified::class);
     }
 
+    public function test_successful_verification_returns_a_token_and_the_user(): void
+    {
+        $user = $this->pendingStudent();
+
+        $response = $this->postJson($this->url, ['email' => $user->email, 'code' => '123456'])
+            ->assertOk()
+            ->assertJsonPath('data.user.id', $user->id)
+            ->assertJsonPath('data.user.email', $user->email)
+            ->assertJsonPath('data.user.is_email_verified', true)
+            ->assertJsonPath('data.user.status', AccountStatus::Active->value);
+
+        $this->assertNotEmpty($response->json('data.token'));
+        $this->assertSame(1, $user->tokens()->count());
+    }
+
     public function test_successful_verification_marks_the_code_verified(): void
     {
         $user = $this->pendingStudent();

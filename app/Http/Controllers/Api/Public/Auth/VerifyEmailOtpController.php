@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Public\Auth;
 use App\Exceptions\Auth\EmailOtpException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Public\Auth\VerifyEmailOtpRequest;
+use App\Http\Resources\Api\UserProfileResource;
 use App\Models\User;
 use App\Services\Auth\EmailOtpService;
 use App\Support\Api\ApiResponse;
@@ -41,6 +42,11 @@ class VerifyEmailOtpController extends Controller
             return $this->errorResponse($e->getMessage(), [], $e->status, $e->errorCode);
         }
 
-        return $this->successResponse(null, 'Email verified successfully. Your account is now active.', Response::HTTP_OK);
+        $token = $user->createToken('api')->plainTextToken;
+
+        return $this->successResponse([
+            'token' => $token,
+            'user' => new UserProfileResource($user->refresh()),
+        ], 'Email verified successfully. Your account is now active.', Response::HTTP_OK);
     }
 }
