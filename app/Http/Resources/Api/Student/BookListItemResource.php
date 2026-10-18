@@ -28,12 +28,20 @@ class BookListItemResource extends JsonResource
             'subject_id' => $this->subject_id,
             'title' => $this->title,
             'author' => $this->author,
+            // Free text the admin types, not an entity: no id and no options.
+            'classification' => $this->classification,
             'type' => $this->type?->value,
             'order' => $this->order,
             'has_pdf' => $this->isPdf() && $this->hasPdf(),
-            // Present for a content book, null for a PDF one: a PDF book keeps
-            // its material in its single file, not in page rows.
-            'pages_count' => $this->isContent() ? (int) ($this->pages_count ?? $this->pagesCount()) : null,
+            // Counted from the page rows of a content book, the admin's own
+            // figure for a PDF one, and null when a PDF book has none.
+            'pages_count' => $this->totalPages(),
+            'cover_image' => $this->coverUrl(),
+            // Nothing records which page of a book a student has read — page
+            // completion is tracked for chapter pages only — so there is no
+            // progress to report for either kind of book. Null, never zero: a
+            // zero would claim the student has read none of it.
+            'progress_percentage' => null,
         ];
     }
 }

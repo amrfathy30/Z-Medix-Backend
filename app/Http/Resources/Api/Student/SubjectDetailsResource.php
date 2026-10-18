@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\Student;
 
+use App\Http\Controllers\Api\Student\SubjectStatisticsController;
 use App\Models\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -15,8 +16,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * Its quizzes are the chapter quizzes, listed here so the client can draw the
  * Quizzes tab without opening every chapter. Taking one still goes through the
- * chapter quiz endpoints. The subject's statistics are a separate endpoint,
- * opened when the student opens that tab.
+ * chapter quiz endpoints.
+ *
+ * `stats` is the Stats tab, carried here so the four tabs of one screen are one
+ * request rather than four. {@see SubjectStatisticsController}
+ * remains the fuller results screen and is unchanged.
  *
  * Chapters carry the state the client needs to draw the track: whether the
  * student has finished each one, and whether they may open it yet. Page bodies
@@ -31,6 +35,7 @@ class SubjectDetailsResource extends JsonResource
      * @param  list<array<string, mixed>>  $quizzes
      * @param  array{completed_chapters: int, total_chapters: int, percentage: float}  $chapterProgress
      * @param  array{completed_pages: int, total_pages: int, percentage: float}  $readingProgress
+     * @param  array<string, mixed>  $stats
      */
     public function __construct(
         $resource,
@@ -38,6 +43,7 @@ class SubjectDetailsResource extends JsonResource
         private array $quizzes,
         private array $chapterProgress,
         private array $readingProgress,
+        private array $stats,
     ) {
         parent::__construct($resource);
     }
@@ -52,11 +58,16 @@ class SubjectDetailsResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'image' => $this->imageUrl(),
+            // The subject's own totals, flat beside the progress breakdowns so
+            // the header does not have to read into them.
+            'total_chapters' => $this->chapterProgress['total_chapters'],
+            'total_books' => $this->publishedBooks->count(),
             'chapters_progress' => $this->chapterProgress,
             'reading_progress' => $this->readingProgress,
             'chapters' => $this->chapters,
             'quizzes' => $this->quizzes,
             'books' => BookListItemResource::collection($this->publishedBooks),
+            'stats' => $this->stats,
         ];
     }
 }

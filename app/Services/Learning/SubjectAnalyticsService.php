@@ -9,12 +9,15 @@ use App\Models\QuizAttempt;
 use App\Models\QuizAttemptQuestion;
 use App\Models\StudentChapterPageProgress;
 use App\Models\StudentChapterProgress;
+use App\Models\StudentNote;
 use App\Models\StudySession;
 use App\Models\Subject;
 use App\Models\User;
 use App\Support\Fellowship\FellowshipClock;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Everything the student's Subject results screen reports, counted from what
@@ -238,6 +241,431 @@ class SubjectAnalyticsService
     public function quizPerformance(User $student, Subject $subject): array
     {
         return $this->quizPerformanceFrom($student, $subject, $this->attemptRows($student, $subject));
+    }
+
+    /**
+     * The Subject Stats tab, as the frontend draws it: four summary cards, the
+     * current week's study hours, the subject's confirmed-answer split, each
+     * chapter's quiz accuracy, and what the student last did here.
+     *
+     * Assembled from the same periods, attempt rows and progress records every
+     * other figure on this service comes from, so the tab cannot disagree with
+     * the chapter track or the quiz list beside it. Nothing is stored and
+     * nothing is estimated: where a figure has no recorded activity behind it,
+     * it is null rather than a zero that would read as a result.
+     *
+     * @return array<string, mixed>
+     */
+    public function subjectStats(User $student, Subject $subject, ?Carbon $asOf = null): array
+    {
+        $asOf ??= now();
+        $periods = $this->periods($student, $subject, $asOf);
+        $attempts = $this->attemptRows($student, $subject);
+        $overall = $this->overallResultFrom($attempts);
+        $chapters = $this->chapterProgress($student, $subject);
+
+        return [
+            'summary' => $this->summaryCards($student, $subject, $periods, $overall, $chapters, $asOf),
+            'weekly_study_time' => $this->weeklyStudyTimeFrom($periods, $asOf),
+            'quiz_performance' => [
+                'total_answers' => $overall['answered_questions'],
+                'correct_answers' => $overall['correct_answers'],
+                'incorrect_answers' => $overall['incorrect_answers'],
+                'correct_percentage' => $this->percentage(
+                    $overall['correct_answers'],
+                    $overall['answered_questions'],
+                ),
+                'incorrect_percentage' => $this->percentage(
+                    $overall['incorrect_answers'],
+                    $overall['answered_questions'],
+                ),
+            ],
+            'topic_performance' => $this->topicPerformanceFrom($subject, $attempts),
+            'recent_activity' => $this->recentActivity($student, $subject),
+        ];
+    }
+
+    /**
+     * The four summary cards, each with the month-on-month change beside it.
+     *
+     * A change is reported only when the previous calendar month has activity
+     * of that kind to compare against — otherwise it is null, because "+100%"
+     * against a month of nothing is not a comparison. Day Streak has no monthly
+     * equivalent at all: it is a run of days ending today, so there is no
+     * previous-month figure to put it against.
+     *
+     * @param  Collection<int, array{start: Carbon, end: Carbon, seconds: int}>  $periods
+     * @param  array<string, mixed>  $overall
+     * @param  array{completed_chapters: int, total_chapters: int, percentage: float}  $chapters
+     * @return array<string, mixed>
+     */
+    private function summaryCards(
+        User $student,
+        Subject $subject,
+        Collection $periods,
+        array $overall,
+        array $chapters,
+        Carbon $asOf,
+    ): array {
+        $thisMonth = FellowshipClock::local($asOf)->startOfMonth();
+        $lastMonth = $thisMonth->copy()->subMonth();
+
+        $studyTimeSeconds = $this->studyTimeSecondsFrom($periods);
+        $months = $this->monthlyStudySeconds($periods, $thisMonth, $lastMonth);
+        $answers = $this->monthlyAnswerTotals($student, $subject, $thisMonth, $lastMonth);
+        $completions = $this->monthlyChapterCompletions($student, $subject, $thisMonth, $lastMonth);
+
+        $currentScore = $answers['current']['answered'] === 0 ? null : $this->percentage(
+            $answers['current']['correct'],
+            $answers['current']['answered'],
+        );
+        $previousScore = $answers['previous']['answered'] === 0 ? null : $this->percentage(
+            $answers['previous']['correct'],
+            $answers['previous']['answered'],
+        );
+
+        return [
+            'total_study_time' => [
+                'seconds' => $studyTimeSeconds,
+                'hours' => $this->hours($studyTimeSeconds),
+                'change_percentage' => $this->change($months['current'], $months['previous']),
+            ],
+            'average_quiz_score' => [
+                'percentage' => $overall['average_score'],
+                'change_percentage' => $this->change($currentScore, $previousScore),
+            ],
+            'completed_chapters' => [
+                'completed' => $chapters['completed_chapters'],
+                'total' => $chapters['total_chapters'],
+                'change_percentage' => $this->change($completions['current'], $completions['previous']),
+            ],
+            'day_streak' => [
+                'days' => $this->dayStreak($student, $subject, $asOf),
+                'change_percentage' => null,
+            ],
+        ];
+    }
+
+    /**
+     * Study hours per weekday for the week `asOf` falls in, Monday to Sunday.
+     *
+     * Always seven rows: a day the student did not study is a zero, which is
+     * what the chart draws, not a missing bar. Built from the same midnight-split
+     * periods as the running total, so the week's bars add up to the time the
+     * total claims for those days.
+     *
+     * @param  Collection<int, array{start: Carbon, end: Carbon, seconds: int}>  $periods
+     * @return list<array{date: string, day: string, seconds: int, hours: float}>
+     */
+    private function weeklyStudyTimeFrom(Collection $periods, Carbon $asOf): array
+    {
+        $totals = $this->secondsByDay($periods);
+        $cursor = FellowshipClock::local($asOf)->startOfWeek(CarbonInterface::MONDAY);
+        $week = [];
+
+        for ($index = 0; $index < 7; $index++) {
+            $date = $cursor->toDateString();
+            $seconds = (int) ($totals[$date] ?? 0);
+
+            $week[] = [
+                'date' => $date,
+                'day' => $cursor->format('D'),
+                'seconds' => $seconds,
+                'hours' => $this->hours($seconds),
+            ];
+
+            $cursor = $cursor->addDay();
+        }
+
+        return $week;
+    }
+
+    /**
+     * Quiz accuracy per chapter — the Topic Performance panel.
+     *
+     * Topics on this screen are the subject's chapters: there is no separate
+     * topic in the application, and chapter reading progress is a different
+     * measure that must not stand in for a quiz result. Every confirmed answer
+     * the student has given in a chapter counts, including those in an attempt
+     * they have not finished, and a chapter they have answered nothing in
+     * reports null rather than a zero that would read as "got it all wrong".
+     *
+     * @param  Collection<int, object>  $attempts
+     * @return list<array{chapter_id: int, chapter_name: string, performance_percentage: float|null}>
+     */
+    private function topicPerformanceFrom(Subject $subject, Collection $attempts): array
+    {
+        $byChapter = $attempts->groupBy(fn (object $row): int => (int) $row->chapter_id);
+
+        return $subject->publishedChapters()
+            ->get(['id', 'title', 'order'])
+            ->map(function (Chapter $chapter) use ($byChapter): array {
+                /** @var Collection<int, object> $rows */
+                $rows = $byChapter->get($chapter->getKey(), collect());
+
+                $answered = (int) $rows->sum(fn (object $row): int => (int) $row->answered_questions);
+                $correct = (int) $rows->sum(fn (object $row): int => (int) $row->correct_answers);
+
+                return [
+                    'chapter_id' => $chapter->getKey(),
+                    'chapter_name' => (string) $chapter->title,
+                    'performance_percentage' => $answered === 0
+                        ? null
+                        : $this->percentage($correct, $answered),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * What the student last did in this subject, newest first.
+     *
+     * Only activity the study flow already persists is reported: a chapter
+     * marked complete, a quiz attempt finished, and a note written on one of
+     * the subject's pages. There is no activity log behind this and none is
+     * introduced — anything the platform does not record simply does not appear,
+     * rather than being inferred.
+     *
+     * @return list<array{type: string, title: string, timestamp: string, entity_id: int, score: float|null}>
+     */
+    private function recentActivity(User $student, Subject $subject, int $limit = 10): array
+    {
+        $chapterIds = $this->publishedChapterIds($subject);
+
+        if ($chapterIds === []) {
+            return [];
+        }
+
+        $completedChapters = StudentChapterProgress::query()
+            ->join('chapters', 'chapters.id', '=', 'student_chapter_progress.chapter_id')
+            ->where('student_chapter_progress.user_id', $student->getKey())
+            ->whereIn('student_chapter_progress.chapter_id', $chapterIds)
+            ->orderByDesc('student_chapter_progress.completed_at')
+            ->limit($limit)
+            ->get(['chapters.id as chapter_id', 'chapters.title as title', 'student_chapter_progress.completed_at'])
+            ->map(fn (object $row): array => [
+                'type' => 'chapter_completed',
+                'title' => (string) $row->title,
+                'timestamp' => Carbon::parse($row->completed_at)->toIso8601String(),
+                'entity_id' => (int) $row->chapter_id,
+                'score' => null,
+            ]);
+
+        $completedQuizzes = QuizAttempt::query()
+            ->where('user_id', $student->getKey())
+            ->where('status', QuizAttemptStatus::Completed)
+            ->whereNotNull('completed_at')
+            ->whereHas('quiz', fn ($quiz) => $quiz->whereIn('chapter_id', $chapterIds))
+            ->with(['quiz:id,chapter_id,title'])
+            ->withCount([
+                'questions as answered_questions' => fn ($query) => $query->whereNotNull('answered_at'),
+                'questions as correct_answers' => fn ($query) => $query
+                    ->whereNotNull('answered_at')
+                    ->where('is_correct', true),
+            ])
+            ->reorder()
+            ->orderByDesc('completed_at')
+            ->limit($limit)
+            ->get()
+            ->map(function (QuizAttempt $attempt): array {
+                $answered = (int) $attempt->answered_questions;
+
+                return [
+                    'type' => 'quiz_completed',
+                    'title' => (string) ($attempt->quiz?->title ?? ''),
+                    'timestamp' => $attempt->completed_at->toIso8601String(),
+                    'entity_id' => $attempt->getKey(),
+                    'score' => $answered === 0
+                        ? null
+                        : $this->percentage((int) $attempt->correct_answers, $answered),
+                ];
+            });
+
+        $notes = StudentNote::query()
+            ->join('chapter_pages', 'chapter_pages.id', '=', 'student_notes.chapter_page_id')
+            ->where('student_notes.user_id', $student->getKey())
+            ->whereIn('chapter_pages.chapter_id', $chapterIds)
+            ->whereNull('chapter_pages.deleted_at')
+            ->orderByDesc('student_notes.created_at')
+            ->limit($limit)
+            ->get(['student_notes.id as note_id', 'student_notes.content', 'student_notes.created_at'])
+            ->map(fn (object $row): array => [
+                'type' => 'note_created',
+                'title' => Str::limit((string) $row->content, 80),
+                'timestamp' => Carbon::parse($row->created_at)->toIso8601String(),
+                'entity_id' => (int) $row->note_id,
+                'score' => null,
+            ]);
+
+        return $completedChapters
+            ->merge($completedQuizzes)
+            ->merge($notes)
+            ->sortByDesc('timestamp')
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Study seconds in the month starting `$current` and in the one starting
+     * `$previous`, from the periods already resolved.
+     *
+     * @param  Collection<int, array{start: Carbon, end: Carbon, seconds: int}>  $periods
+     * @return array{current: int, previous: int}
+     */
+    private function monthlyStudySeconds(Collection $periods, Carbon $current, Carbon $previous): array
+    {
+        $totals = ['current' => 0, 'previous' => 0];
+        $currentMonth = $current->format('Y-m');
+        $previousMonth = $previous->format('Y-m');
+
+        foreach ($this->secondsByDay($periods) as $date => $seconds) {
+            $month = substr($date, 0, 7);
+
+            if ($month === $currentMonth) {
+                $totals['current'] += $seconds;
+            } elseif ($month === $previousMonth) {
+                $totals['previous'] += $seconds;
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Confirmed answers and correct answers in each of the two months.
+     *
+     * The answers are read once and bucketed in PHP through the same clock the
+     * day streak and the charts use, so a month boundary falls where the
+     * student's own midnight does rather than where the database's would.
+     *
+     * @return array{current: array{answered: int, correct: int}, previous: array{answered: int, correct: int}}
+     */
+    private function monthlyAnswerTotals(User $student, Subject $subject, Carbon $current, Carbon $previous): array
+    {
+        $totals = [
+            'current' => ['answered' => 0, 'correct' => 0],
+            'previous' => ['answered' => 0, 'correct' => 0],
+        ];
+
+        $chapterIds = $this->publishedChapterIds($subject);
+
+        if ($chapterIds === []) {
+            return $totals;
+        }
+
+        $rows = QuizAttemptQuestion::query()
+            ->join('quiz_attempts', 'quiz_attempts.id', '=', 'quiz_attempt_questions.quiz_attempt_id')
+            ->join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quiz_id')
+            ->where('quiz_attempts.user_id', $student->getKey())
+            ->whereIn('quizzes.chapter_id', $chapterIds)
+            ->whereNull('quizzes.deleted_at')
+            ->whereNotNull('quiz_attempt_questions.answered_at')
+            ->where('quiz_attempt_questions.answered_at', '>=', $previous->copy()->utc())
+            ->where('quiz_attempt_questions.answered_at', '<', $current->copy()->addMonth()->utc())
+            ->get([
+                'quiz_attempt_questions.answered_at',
+                'quiz_attempt_questions.is_correct',
+            ]);
+
+        $currentMonth = $current->format('Y-m');
+        $previousMonth = $previous->format('Y-m');
+
+        foreach ($rows as $row) {
+            $month = substr(FellowshipClock::dateOf($row->answered_at), 0, 7);
+
+            $bucket = match ($month) {
+                $currentMonth => 'current',
+                $previousMonth => 'previous',
+                default => null,
+            };
+
+            if ($bucket === null) {
+                continue;
+            }
+
+            $totals[$bucket]['answered']++;
+
+            if ((bool) $row->is_correct) {
+                $totals[$bucket]['correct']++;
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Chapters of this subject completed in each of the two months.
+     *
+     * @return array{current: int, previous: int}
+     */
+    private function monthlyChapterCompletions(User $student, Subject $subject, Carbon $current, Carbon $previous): array
+    {
+        $totals = ['current' => 0, 'previous' => 0];
+        $chapterIds = $this->publishedChapterIds($subject);
+
+        if ($chapterIds === []) {
+            return $totals;
+        }
+
+        $currentMonth = $current->format('Y-m');
+        $previousMonth = $previous->format('Y-m');
+
+        $completions = StudentChapterProgress::query()
+            ->where('user_id', $student->getKey())
+            ->whereIn('chapter_id', $chapterIds)
+            ->where('completed_at', '>=', $previous->copy()->utc())
+            ->where('completed_at', '<', $current->copy()->addMonth()->utc())
+            ->pluck('completed_at');
+
+        foreach ($completions as $completedAt) {
+            $month = substr(FellowshipClock::dateOf($completedAt), 0, 7);
+
+            if ($month === $currentMonth) {
+                $totals['current']++;
+            } elseif ($month === $previousMonth) {
+                $totals['previous']++;
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Study seconds per local calendar day, keyed by `Y-m-d`.
+     *
+     * @param  Collection<int, array{start: Carbon, end: Carbon, seconds: int}>  $periods
+     * @return array<string, int>
+     */
+    private function secondsByDay(Collection $periods): array
+    {
+        $totals = [];
+
+        foreach ($periods as $period) {
+            foreach (FellowshipClock::splitAcrossDays($period['start'], $period['end']) as $date => $seconds) {
+                $totals[$date] = ($totals[$date] ?? 0) + $seconds;
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * How much a figure moved against last month, as a percentage of last
+     * month's.
+     *
+     * Null when there is nothing to compare against — no previous figure, or a
+     * previous figure of zero. A card with no comparison draws no comparison;
+     * it never shows an invented one.
+     */
+    private function change(int|float|null $current, int|float|null $previous): ?float
+    {
+        if ($previous === null || (float) $previous === 0.0 || $current === null) {
+            return null;
+        }
+
+        return round((((float) $current - (float) $previous) / (float) $previous) * 100, 2);
     }
 
     /**
