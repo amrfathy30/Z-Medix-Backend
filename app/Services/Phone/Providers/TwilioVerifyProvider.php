@@ -4,6 +4,7 @@ namespace App\Services\Phone\Providers;
 
 use App\Contracts\PhoneVerificationProviderInterface;
 use App\Exceptions\Phone\VerificationException;
+use Illuminate\Support\Facades\Log;
 use Twilio\Exceptions\TwilioException;
 use Twilio\Rest\Client;
 
@@ -30,7 +31,11 @@ class TwilioVerifyProvider implements PhoneVerificationProviderInterface
         $sid = config('phone.providers.twilio_verify.verify_service_sid');
 
         if (! is_string($sid) || $sid === '') {
-            throw VerificationException::providerError('Twilio Verify service SID is not configured.');
+            // A deployment mistake, not something a client can act on, so it is
+            // logged and answered with the same generic delivery failure.
+            Log::error('Twilio Verify service SID is not configured.');
+
+            throw VerificationException::deliveryFailed();
         }
 
         return $sid;
@@ -52,7 +57,7 @@ class TwilioVerifyProvider implements PhoneVerificationProviderInterface
                 ->verifications
                 ->create($e164, $channel);
         } catch (TwilioException $e) {
-            throw VerificationException::providerError($e->getMessage());
+            throw $this->maskProviderFailure('send', $e);
         }
 
         return [
@@ -76,13 +81,29 @@ class TwilioVerifyProvider implements PhoneVerificationProviderInterface
                 ->verificationChecks
                 ->create(['to' => $e164, 'code' => $code]);
         } catch (TwilioException $e) {
-            throw VerificationException::providerError($e->getMessage());
+            throw $this->maskProviderFailure('check', $e);
         }
 
         return [
             'valid' => $check->status === 'approved',
             'status' => $check->status,
         ];
+    }
+
+    /**
+     * Twilio's own wording can name the account, the Verify service or the
+     * recipient, so it is written to the log and replaced by a generic message
+     * before it can reach an API client.
+     */
+    private function maskProviderFailure(string $operation, TwilioException $e): VerificationException
+    {
+        Log::warning('Twilio Verify request failed.', [
+            'operation' => $operation,
+            'code' => $e->getCode(),
+            'message' => $e->getMessage(),
+        ]);
+
+        return VerificationException::deliveryFailed();
     }
 
     private function ensureChannelSupported(string $channel): void
