@@ -2613,12 +2613,17 @@
     },
     "/public/auth/verify-phone": {
       "post": {
-        "summary": "verify-phone",
+        "summary": "Verify phone number",
         "deprecated": false,
-        "description": "",
-        "operationId": "public.auth.login.post.public.auth.verify-phone",
+        "description": "Confirms a one-time code against the authenticated student's **primary** phone number and marks it verified.\n\nThe number is resolved server-side from the authenticated user, so a code can never be applied to another account's phone; `phone`, `phone_id` and `e164_number` in the body are stripped and ignored.\n\nVerification grants **no additional access** — it only flips `phone_verified` on the profile. If the number is already verified the call succeeds without consuming a code.\n\nEach code allows a limited number of attempts (default 5). Every submission, right or wrong, consumes one. Once the allowance is spent the code is burned and a new one must be requested.\n\nChanging the phone number through `POST /public/profile` resets it to pending and expires any outstanding code, so a code issued for the old number cannot verify the new one.",
+        "operationId": "public.auth.verify-phone",
         "tags": [
-          "Login"
+          "Phone Verification"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
         ],
         "parameters": [
           {
@@ -2643,55 +2648,65 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
                   "code": {
+                    "type": "string",
                     "example": "123456",
-                    "type": "string"
+                    "description": "The numeric code delivered by SMS. 4–10 digits."
                   }
-                }
+                },
+                "required": [
+                  "code"
+                ],
+                "x-apidog-orders": [
+                  "code"
+                ],
+                "x-apidog-ignore-properties": []
               },
               "example": {
                 "code": "123456"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "The number is verified. `data.user` is the refreshed profile with `phone_verified: true`.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "const": true
                     },
                     "message": {
                       "type": "string",
-                      "const": "Logged in successfully."
+                      "example": "Phone number verified successfully."
                     },
                     "data": {
                       "type": "object",
                       "properties": {
-                        "token": {
-                          "type": "string"
+                        "phone_verified": {
+                          "type": "boolean",
+                          "const": true
                         },
                         "user": {
                           "$ref": "#/components/schemas/UserProfileResource"
                         }
                       },
                       "required": [
-                        "token",
+                        "phone_verified",
                         "user"
                       ],
                       "x-apidog-orders": [
-                        "token",
+                        "phone_verified",
                         "user"
                       ],
                       "x-apidog-ignore-properties": []
@@ -2711,151 +2726,177 @@
                 }
               }
             },
-            "headers": {},
-            "x-apidog-ordering": 0
+            "headers": {}
           },
           "401": {
-            "description": "",
+            "description": "No valid bearer token was supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "const": "Unauthenticated."
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "x-apidog-orders": [
+                    "message"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {}
+          },
+          "422": {
+            "description": "Wrong code (`PHONE_OTP_INVALID`), the code has expired (`PHONE_OTP_EXPIRED`), no code is outstanding (`PHONE_OTP_NOT_FOUND`), no phone is on record (`PHONE_NOT_FOUND`), or `code` failed validation.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "const": false
                     },
                     "message": {
                       "type": "string",
-                      "const": "The provided credentials are incorrect."
+                      "example": "The verification code is invalid."
                     },
                     "errors": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      },
-                      "minItems": 0,
-                      "maxItems": 0,
-                      "additionalItems": false
+                      "type": "object"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHONE_OTP_INVALID",
+                        "PHONE_OTP_EXPIRED",
+                        "PHONE_OTP_NOT_FOUND",
+                        "PHONE_NOT_FOUND"
+                      ]
                     }
                   },
                   "required": [
                     "success",
                     "message",
-                    "errors"
+                    "errors",
+                    "code"
                   ],
                   "x-apidog-orders": [
                     "success",
                     "message",
-                    "errors"
+                    "errors",
+                    "code"
                   ],
                   "x-apidog-ignore-properties": []
                 }
               }
             },
-            "headers": {},
-            "x-apidog-ordering": 1
+            "headers": {}
           },
-          "403": {
-            "description": "",
+          "429": {
+            "description": "The attempt allowance for this code is spent. Request a new code.",
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean"
-                        },
-                        "message": {
-                          "type": "string",
-                          "const": "Your account is pending approval. Please check back later."
-                        },
-                        "errors": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          },
-                          "minItems": 0,
-                          "maxItems": 0,
-                          "additionalItems": false
-                        }
-                      },
-                      "required": [
-                        "success",
-                        "message",
-                        "errors"
-                      ],
-                      "x-apidog-orders": [
-                        "success",
-                        "message",
-                        "errors"
-                      ],
-                      "x-apidog-ignore-properties": []
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
                     },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean"
-                        },
-                        "message": {
-                          "type": "string",
-                          "const": "Your account has been suspended. Please contact support."
-                        },
-                        "errors": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          },
-                          "minItems": 0,
-                          "maxItems": 0,
-                          "additionalItems": false
-                        }
-                      },
-                      "required": [
-                        "success",
-                        "message",
-                        "errors"
-                      ],
-                      "x-apidog-orders": [
-                        "success",
-                        "message",
-                        "errors"
-                      ],
-                      "x-apidog-ignore-properties": []
+                    "message": {
+                      "type": "string",
+                      "const": "Maximum verification attempts exceeded. Please request a new code."
+                    },
+                    "errors": {
+                      "type": "object"
+                    },
+                    "code": {
+                      "type": "string",
+                      "const": "PHONE_OTP_MAX_ATTEMPTS_EXCEEDED"
                     }
-                  ]
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-ignore-properties": []
                 }
               }
             },
-            "headers": {},
-            "x-apidog-ordering": 2
+            "headers": {}
           },
-          "422": {
-            "$ref": "#/components/responses/ValidationException",
-            "description": "",
-            "x-apidog-ordering": 3
+          "503": {
+            "description": "The verification provider could not be reached. The upstream message is logged, never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "We could not send a verification code right now. Please try again shortly."
+                    },
+                    "errors": {
+                      "type": "object"
+                    },
+                    "code": {
+                      "type": "string",
+                      "const": "PHONE_OTP_SEND_FAILED"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {}
           }
         },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "x-apidog-folder": "Auth/phone OTP",
-        "x-apidog-status": "released",
-        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734215-run"
+        "x-apidog-folder": ""
       }
     },
     "/public/auth/verify-phone/send": {
       "post": {
-        "summary": "verify-phone send",
+        "summary": "Send phone verification code",
         "deprecated": false,
-        "description": "",
-        "operationId": "public.auth.login.post.public.auth.verify-phone.send",
+        "description": "Sends a one-time verification code to the authenticated student's **primary** phone number via Twilio Verify.\n\nThe number is always resolved server-side from the authenticated user; any `phone`, `phone_id` or `e164_number` in the body is stripped and ignored.\n\nPhone verification is **optional**. Nothing on the platform — registration, login, profile updates, studying, quizzes, fellowships or AI chat — is gated on a verified phone number. This endpoint exists only so a student who wants a verified number can obtain one.\n\nIssuing a code expires any previous pending code for the same number. If the number is already verified the call succeeds without sending anything.\n\n**Limits** — a resend cooldown (default 60s) and an hourly allowance (default 5), both scoped to the phone number, purpose and client IP, on top of a coarse `throttle:10,1` route limit. A failed delivery does not consume the allowance.\n\nUpstream provider errors are never surfaced verbatim; they are logged and replaced by a generic `PHONE_OTP_SEND_FAILED`.",
+        "operationId": "public.auth.verify-phone.send",
         "tags": [
-          "Login"
+          "Phone Verification"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
         ],
         "parameters": [
           {
@@ -2879,135 +2920,89 @@
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "sms"
+                    ],
+                    "description": "Optional delivery channel. Defaults to `phone.default_channel` (sms). Must be one of `phone.supported_channels`."
+                  }
+                },
+                "x-apidog-orders": [
+                  "channel"
+                ],
+                "x-apidog-ignore-properties": []
+              },
+              "example": {
+                "channel": "sms"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "",
+            "description": "Code sent, or the number was already verified.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "message": {
-                      "type": "string",
-                      "const": "Logged in successfully."
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "token": {
-                          "type": "string"
-                        },
-                        "user": {
-                          "$ref": "#/components/schemas/UserProfileResource"
-                        }
-                      },
-                      "required": [
-                        "token",
-                        "user"
-                      ],
-                      "x-apidog-orders": [
-                        "token",
-                        "user"
-                      ],
-                      "x-apidog-ignore-properties": []
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "message",
-                    "data"
-                  ],
-                  "x-apidog-orders": [
-                    "success",
-                    "message",
-                    "data"
-                  ],
-                  "x-apidog-ignore-properties": []
-                }
-              }
-            },
-            "headers": {},
-            "x-apidog-ordering": 0
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "message": {
-                      "type": "string",
-                      "const": "The provided credentials are incorrect."
-                    },
-                    "errors": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      },
-                      "minItems": 0,
-                      "maxItems": 0,
-                      "additionalItems": false
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "message",
-                    "errors"
-                  ],
-                  "x-apidog-orders": [
-                    "success",
-                    "message",
-                    "errors"
-                  ],
-                  "x-apidog-ignore-properties": []
-                }
-              }
-            },
-            "headers": {},
-            "x-apidog-ordering": 1
-          },
-          "403": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
+                  "oneOf": [
                     {
                       "type": "object",
                       "properties": {
                         "success": {
-                          "type": "boolean"
+                          "type": "boolean",
+                          "const": true
                         },
                         "message": {
                           "type": "string",
-                          "const": "Your account is pending approval. Please check back later."
+                          "example": "We have sent a verification code to your phone number."
                         },
-                        "errors": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "phone": {
+                              "type": "string",
+                              "example": "+201234567890"
+                            },
+                            "phone_verified": {
+                              "type": "boolean",
+                              "example": false
+                            },
+                            "expires_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
                           },
-                          "minItems": 0,
-                          "maxItems": 0,
-                          "additionalItems": false
+                          "required": [
+                            "phone",
+                            "phone_verified",
+                            "expires_at"
+                          ],
+                          "x-apidog-orders": [
+                            "phone",
+                            "phone_verified",
+                            "expires_at"
+                          ],
+                          "x-apidog-ignore-properties": []
                         }
                       },
                       "required": [
                         "success",
                         "message",
-                        "errors"
+                        "data"
                       ],
                       "x-apidog-orders": [
                         "success",
                         "message",
-                        "errors"
+                        "data"
                       ],
                       "x-apidog-ignore-properties": []
                     },
@@ -3015,31 +3010,45 @@
                       "type": "object",
                       "properties": {
                         "success": {
-                          "type": "boolean"
+                          "type": "boolean",
+                          "const": true
                         },
                         "message": {
                           "type": "string",
-                          "const": "Your account has been suspended. Please contact support."
+                          "const": "This phone number is already verified."
                         },
-                        "errors": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "phone": {
+                              "type": "string",
+                              "example": "+201234567890"
+                            },
+                            "phone_verified": {
+                              "type": "boolean",
+                              "const": true
+                            }
                           },
-                          "minItems": 0,
-                          "maxItems": 0,
-                          "additionalItems": false
+                          "required": [
+                            "phone",
+                            "phone_verified"
+                          ],
+                          "x-apidog-orders": [
+                            "phone",
+                            "phone_verified"
+                          ],
+                          "x-apidog-ignore-properties": []
                         }
                       },
                       "required": [
                         "success",
                         "message",
-                        "errors"
+                        "data"
                       ],
                       "x-apidog-orders": [
                         "success",
                         "message",
-                        "errors"
+                        "data"
                       ],
                       "x-apidog-ignore-properties": []
                     }
@@ -3047,23 +3056,162 @@
                 }
               }
             },
-            "headers": {},
-            "x-apidog-ordering": 2
+            "headers": {}
+          },
+          "401": {
+            "description": "No valid bearer token was supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "const": "Unauthenticated."
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "x-apidog-orders": [
+                    "message"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {}
           },
           "422": {
-            "$ref": "#/components/responses/ValidationException",
-            "description": "",
-            "x-apidog-ordering": 3
+            "description": "No phone number on record (`PHONE_NOT_FOUND`), or the requested channel is not supported (validation error on `channel`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "No phone number is on record for this account. Please add one first."
+                    },
+                    "errors": {
+                      "type": "object"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHONE_NOT_FOUND"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {}
+          },
+          "429": {
+            "description": "Resend cooldown still active (`PHONE_OTP_RESEND_COOLDOWN`) or the hourly allowance is spent (`PHONE_OTP_SEND_LIMIT_REACHED`). The coarse route throttle may also answer here without a `code`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Please wait 42 seconds before requesting another verification code."
+                    },
+                    "errors": {
+                      "type": "object"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHONE_OTP_RESEND_COOLDOWN",
+                        "PHONE_OTP_SEND_LIMIT_REACHED"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {}
+          },
+          "503": {
+            "description": "The verification provider could not be reached. The upstream message is logged, never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "We could not send a verification code right now. Please try again shortly."
+                    },
+                    "errors": {
+                      "type": "object"
+                    },
+                    "code": {
+                      "type": "string",
+                      "const": "PHONE_OTP_SEND_FAILED"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-orders": [
+                    "success",
+                    "message",
+                    "errors",
+                    "code"
+                  ],
+                  "x-apidog-ignore-properties": []
+                }
+              }
+            },
+            "headers": {}
           }
         },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "x-apidog-folder": "Auth/phone OTP",
-        "x-apidog-status": "released",
-        "x-run-in-apidog": "https://app.apidog.com/web/project/1369299/apis/api-44734216-run"
+        "x-apidog-folder": ""
       }
     },
     "/student/study/sessions": {
@@ -12288,67 +12436,135 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "integer"
           },
           "name": {
             "type": "string"
           },
-          "first_name": {
-            "type": "string"
-          },
-          "last_name": {
-            "type": "string"
+          "full_name": {
+            "type": "string",
+            "description": "Canonical student-facing name; mirrors `name`."
           },
           "email": {
-            "type": "string"
+            "type": "string",
+            "format": "email"
+          },
+          "email_verified": {
+            "type": "boolean"
           },
           "is_email_verified": {
-            "type": "string"
+            "type": "boolean",
+            "description": "Retained for the existing contract; same value as `email_verified`."
           },
           "email_verified_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
-          "type": {
-            "type": "string"
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "E.164 form of the student's primary phone number, or null when none is on record.",
+            "example": "+201234567890"
+          },
+          "phone_verified": {
+            "type": "boolean",
+            "description": "Whether the number reported in `phone` is verified. False when no phone exists. Read-only: it is derived from the phone's own status and can never be set through a request."
+          },
+          "country": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "x-apidog-orders": [
+              "id",
+              "name"
+            ],
+            "x-apidog-ignore-properties": []
+          },
+          "institution": {
+            "type": "string",
+            "nullable": true
+          },
+          "field_of_study": {
+            "type": "string",
+            "nullable": true
+          },
+          "profile_photo": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "active",
+              "pending",
+              "inactive",
+              "suspended",
+              "blocked"
+            ]
           },
           "last_login_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "created_at": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "required": [
           "id",
           "name",
-          "first_name",
-          "last_name",
+          "full_name",
           "email",
+          "email_verified",
           "is_email_verified",
           "email_verified_at",
-          "type",
+          "phone",
+          "phone_verified",
+          "country",
+          "institution",
+          "field_of_study",
+          "profile_photo",
           "status",
           "last_login_at",
           "created_at"
         ],
-        "title": "UserProfileResource",
         "x-apidog-orders": [
           "id",
           "name",
-          "first_name",
-          "last_name",
+          "full_name",
           "email",
+          "email_verified",
           "is_email_verified",
           "email_verified_at",
-          "type",
+          "phone",
+          "phone_verified",
+          "country",
+          "institution",
+          "field_of_study",
+          "profile_photo",
           "status",
           "last_login_at",
           "created_at"
         ],
         "x-apidog-ignore-properties": [],
+        "title": "UserProfileResource",
         "x-apidog-folder": ""
       },
       "ErrorEnvelope": {

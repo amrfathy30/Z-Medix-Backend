@@ -58,7 +58,7 @@ class ProfileTest extends TestCase
                 'data' => [
                     'id', 'name', 'full_name', 'email', 'email_verified', 'is_email_verified',
                     'phone', 'phone_verified', 'country', 'institution', 'field_of_study',
-                    'profile_photo', 'type', 'status', 'last_login_at',
+                    'profile_photo', 'status', 'last_login_at',
                 ],
             ])
             ->assertJsonPath('data.id', $user->id)
@@ -110,7 +110,7 @@ class ProfileTest extends TestCase
         $user = $this->user();
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['full_name' => 'Yousra Ahmed'])
+        $this->postJson('/api/public/profile', ['full_name' => 'Yousra Ahmed'])
             ->assertOk()
             ->assertJsonPath('data.full_name', 'Yousra Ahmed')
             ->assertJsonPath('data.name', 'Yousra Ahmed');
@@ -133,7 +133,7 @@ class ProfileTest extends TestCase
         $user = $this->user();
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['first_name' => 'Bob', 'last_name' => 'Builder'])
+        $this->postJson('/api/public/profile', ['first_name' => 'Bob', 'last_name' => 'Builder'])
             ->assertOk();
 
         $this->assertDatabaseHas('users', [
@@ -148,7 +148,7 @@ class ProfileTest extends TestCase
         $user = $this->user();
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['name' => 'New Name'])
+        $this->postJson('/api/public/profile', ['name' => 'New Name'])
             ->assertOk()
             ->assertJsonPath('data.name', 'New Name')
             ->assertJsonPath('data.email', $user->email);
@@ -163,7 +163,7 @@ class ProfileTest extends TestCase
         $user = $this->user(['email_verified_at' => now()]);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['email' => 'new@example.com'])
+        $this->postJson('/api/public/profile', ['email' => 'new@example.com'])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
 
@@ -178,7 +178,7 @@ class ProfileTest extends TestCase
         $user = $this->user(['email_verified_at' => $verifiedAt]);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', [
+        $this->postJson('/api/public/profile', [
             'full_name' => 'Updated Name',
             'email' => 'updated@example.com',
         ])->assertStatus(422);
@@ -199,7 +199,7 @@ class ProfileTest extends TestCase
 
         Sanctum::actingAs($this->user());
 
-        $this->patchJson('/api/public/profile', ['email' => 'changed@example.com'])
+        $this->postJson('/api/public/profile', ['email' => 'changed@example.com'])
             ->assertStatus(422);
 
         Notification::assertNotSentTo([$this->user()], VerifyEmail::class);
@@ -211,7 +211,7 @@ class ProfileTest extends TestCase
         $user = $this->user();
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', [])
+        $this->postJson('/api/public/profile', [])
             ->assertOk()
             ->assertJsonPath('data.name', $user->name);
     }
@@ -222,7 +222,7 @@ class ProfileTest extends TestCase
         $user = $this->user(['email_verified_at' => $verifiedAt]);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['email' => $user->email])->assertOk();
+        $this->postJson('/api/public/profile', ['email' => $user->email])->assertOk();
 
         $this->assertSame($verifiedAt->toDateTimeString(), $user->fresh()->email_verified_at->toDateTimeString());
     }
@@ -231,7 +231,7 @@ class ProfileTest extends TestCase
     {
         Sanctum::actingAs($this->user());
 
-        $this->patchJson('/api/public/profile', ['email' => 'not-an-email'])
+        $this->postJson('/api/public/profile', ['email' => 'not-an-email'])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
     }
@@ -241,7 +241,7 @@ class ProfileTest extends TestCase
         $existing = $this->user(['email' => 'taken@example.com']);
         Sanctum::actingAs($this->user());
 
-        $this->patchJson('/api/public/profile', ['email' => 'taken@example.com'])
+        $this->postJson('/api/public/profile', ['email' => 'taken@example.com'])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
     }
@@ -251,7 +251,7 @@ class ProfileTest extends TestCase
         $user = $this->user(['email_verified_at' => now()]);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['email' => $user->email])->assertOk();
+        $this->postJson('/api/public/profile', ['email' => $user->email])->assertOk();
 
         $this->assertNotNull($user->fresh()->email_verified_at);
     }
@@ -286,15 +286,15 @@ class ProfileTest extends TestCase
         $user = $this->user();
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['institution' => 'Cairo University'])
+        $this->postJson('/api/public/profile', ['institution' => 'Cairo University'])
             ->assertOk()
             ->assertJsonPath('data.institution', 'Cairo University');
 
-        $this->patchJson('/api/public/profile', ['institution' => 'Ain Shams University'])
+        $this->postJson('/api/public/profile', ['institution' => 'Ain Shams University'])
             ->assertOk()
             ->assertJsonPath('data.institution', 'Ain Shams University');
 
-        $this->patchJson('/api/public/profile', ['institution' => null])
+        $this->postJson('/api/public/profile', ['institution' => null])
             ->assertOk()
             ->assertJsonPath('data.institution', null);
 
@@ -306,15 +306,15 @@ class ProfileTest extends TestCase
         $user = $this->user();
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['field_of_study' => 'Medicine'])
+        $this->postJson('/api/public/profile', ['field_of_study' => 'Medicine'])
             ->assertOk()
             ->assertJsonPath('data.field_of_study', 'Medicine');
 
-        $this->patchJson('/api/public/profile', ['field_of_study' => 'Dentistry'])
+        $this->postJson('/api/public/profile', ['field_of_study' => 'Dentistry'])
             ->assertOk()
             ->assertJsonPath('data.field_of_study', 'Dentistry');
 
-        $this->patchJson('/api/public/profile', ['field_of_study' => null])
+        $this->postJson('/api/public/profile', ['field_of_study' => null])
             ->assertOk()
             ->assertJsonPath('data.field_of_study', null);
 
@@ -326,7 +326,7 @@ class ProfileTest extends TestCase
         $user = $this->user(['institution' => 'Cairo University', 'field_of_study' => 'Medicine']);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['full_name' => 'Only The Name'])->assertOk();
+        $this->postJson('/api/public/profile', ['full_name' => 'Only The Name'])->assertOk();
 
         $user->refresh();
 
@@ -338,7 +338,7 @@ class ProfileTest extends TestCase
     {
         Sanctum::actingAs($this->user());
 
-        $this->patchJson('/api/public/profile', [
+        $this->postJson('/api/public/profile', [
             'institution' => str_repeat('a', 256),
             'field_of_study' => str_repeat('b', 256),
         ])->assertStatus(422)->assertJsonValidationErrors(['institution', 'field_of_study']);
@@ -372,7 +372,7 @@ class ProfileTest extends TestCase
         $user = $this->user();
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['country_id' => $saudi->id])
+        $this->postJson('/api/public/profile', ['country_id' => $saudi->id])
             ->assertOk()
             ->assertJsonPath('data.country.id', $saudi->id)
             ->assertJsonPath('data.country.name', 'Saudi Arabia');
@@ -384,7 +384,7 @@ class ProfileTest extends TestCase
     {
         Sanctum::actingAs($this->user());
 
-        $this->patchJson('/api/public/profile', ['country_id' => 999999])
+        $this->postJson('/api/public/profile', ['country_id' => 999999])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['country_id']);
     }
@@ -485,7 +485,7 @@ class ProfileTest extends TestCase
         $this->phoneFor($user, PhoneStatus::Verified);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['phone' => '+201119998888'])
+        $this->postJson('/api/public/profile', ['phone' => '+201119998888'])
             ->assertOk()
             ->assertJsonPath('data.phone', '+201119998888');
 
@@ -498,7 +498,7 @@ class ProfileTest extends TestCase
         $user = $this->user(['country_id' => $this->country()->id]);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['phone' => '+201119998888'])
+        $this->postJson('/api/public/profile', ['phone' => '+201119998888'])
             ->assertOk()
             ->assertJsonPath('data.phone', '+201119998888')
             ->assertJsonPath('data.phone_verified', false);
@@ -511,7 +511,7 @@ class ProfileTest extends TestCase
         $user = $this->user(['country_id' => $this->country()->id]);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', ['phone' => '12'])
+        $this->postJson('/api/public/profile', ['phone' => '12'])
             ->assertStatus(422)
             ->assertJsonPath('code', 'INVALID_PHONE');
 
@@ -526,7 +526,7 @@ class ProfileTest extends TestCase
         $this->phoneFor($user, PhoneStatus::Pending);
         Sanctum::actingAs($user);
 
-        $this->patchJson('/api/public/profile', [
+        $this->postJson('/api/public/profile', [
             'email_verified' => true,
             'is_email_verified' => true,
             'email_verified_at' => now()->toIso8601String(),
