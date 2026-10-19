@@ -51,6 +51,7 @@ use App\Policies\QuizPolicy;
 use App\Policies\ReportCasePolicy;
 use App\Policies\SubjectPolicy;
 use App\Services\Fellowship\ExcelSpreadsheetReader;
+use App\Services\Phone\Providers\LogPhoneVerificationProvider;
 use App\Services\Phone\Providers\TwilioVerifyProvider;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -72,6 +73,9 @@ class AppServiceProvider extends ServiceProvider
 
             return match ($provider) {
                 'twilio_verify' => new TwilioVerifyProvider,
+                // Local development only: logs instead of sending, and approves
+                // nothing on its own. See LogPhoneVerificationProvider.
+                'log' => new LogPhoneVerificationProvider,
                 default => throw new \InvalidArgumentException("Unknown phone verification provider: [{$provider}]."),
             };
         });

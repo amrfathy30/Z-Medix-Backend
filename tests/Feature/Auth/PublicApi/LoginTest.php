@@ -35,7 +35,7 @@ class LoginTest extends TestCase
                 'success',
                 'data' => [
                     'token',
-                    'user' => ['id', 'name', 'email', 'is_email_verified', 'type', 'status'],
+                    'user' => ['id', 'name', 'email', 'is_email_verified', 'phone', 'phone_verified', 'status'],
                 ],
             ])
             ->assertJsonPath('success', true)

@@ -10,8 +10,10 @@ use App\Http\Controllers\Api\Public\Auth\RegisterController;
 use App\Http\Controllers\Api\Public\Auth\ResendEmailOtpController;
 use App\Http\Controllers\Api\Public\Auth\ResendPasswordResetOtpController;
 use App\Http\Controllers\Api\Public\Auth\ResetPasswordController;
+use App\Http\Controllers\Api\Public\Auth\SendPhoneOtpController;
 use App\Http\Controllers\Api\Public\Auth\VerifyEmailOtpController;
 use App\Http\Controllers\Api\Public\Auth\VerifyPasswordResetOtpController;
+use App\Http\Controllers\Api\Public\Auth\VerifyPhoneOtpController;
 use App\Http\Controllers\Api\Public\BlogController;
 use App\Http\Controllers\Api\Public\ContactController;
 use App\Http\Controllers\Api\Public\CountryController;
@@ -65,6 +67,20 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
         Route::post('email/verification-notification', [EmailVerificationController::class, 'send'])
             ->name('email.send');
         Route::post('change-password', ChangePasswordController::class)->name('change-password');
+
+        // Optional phone verification. Nothing on the platform is gated on a
+        // verified phone number; these endpoints only let a student flip
+        // `phone_verified` on their own primary number. The more specific
+        // `/send` path is declared first so it is not shadowed. Throttles here
+        // are coarse abuse protection; the resend cooldown, hourly send
+        // allowance and per-code attempt limit are enforced by
+        // PhoneNumberService.
+        Route::post('verify-phone/send', SendPhoneOtpController::class)
+            ->middleware('throttle:10,1')
+            ->name('verify-phone.send');
+        Route::post('verify-phone', VerifyPhoneOtpController::class)
+            ->middleware('throttle:10,1')
+            ->name('verify-phone');
     });
 });
 

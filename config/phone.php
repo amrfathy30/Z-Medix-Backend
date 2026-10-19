@@ -103,6 +103,89 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | OTP Attempt Limit
+    |--------------------------------------------------------------------------
+    |
+    | How many times a single OTP may be submitted before it is burned. The
+    | external provider enforces its own attempt ceiling independently; this is
+    | the local limit recorded against each phone_verification_otps row.
+    |
+    | Env: PHONE_OTP_MAX_ATTEMPTS
+    |
+    */
+
+    'otp_max_attempts' => (int) env('PHONE_OTP_MAX_ATTEMPTS', 5),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resend Cooldown
+    |--------------------------------------------------------------------------
+    |
+    | Minimum number of seconds between two OTP deliveries for the same phone
+    | number, purpose and client IP. Every send is billable, so this is the
+    | first line of defence against SMS cost abuse.
+    |
+    | Env: PHONE_OTP_RESEND_COOLDOWN
+    |
+    */
+
+    'otp_resend_cooldown_seconds' => (int) env('PHONE_OTP_RESEND_COOLDOWN', 60),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Hourly Send Allowance
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of OTP deliveries per rolling hour for the same phone
+    | number, purpose and client IP.
+    |
+    | Env: PHONE_OTP_MAX_SENDS_PER_HOUR
+    |
+    */
+
+    'otp_max_sends_per_hour' => (int) env('PHONE_OTP_MAX_SENDS_PER_HOUR', 5),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Test OTP Code
+    |--------------------------------------------------------------------------
+    |
+    | Fixed code accepted in place of the real one, for manual testing on
+    | non-production environments. Leave unset to disable the behaviour.
+    |
+    | It replaces the provider check only: a real, unexpired pending OTP with
+    | attempts remaining must still exist, and the attempt counter still moves.
+    | When it matches, Twilio Verify is not contacted at all.
+    |
+    | Mirrors auth_features.email_otp.test_code, and is scoped separately so a
+    | phone test code never implies an email one.
+    |
+    | Env: PHONE_TEST_OTP_CODE
+    |
+    */
+
+    'otp_test_code' => env('PHONE_TEST_OTP_CODE'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Test OTP Environments
+    |--------------------------------------------------------------------------
+    |
+    | Environments in which 'otp_test_code' is honoured. Both this list and the
+    | code itself must be set, otherwise the behaviour stays disabled.
+    |
+    | 'production' is refused even when it appears here.
+    |
+    | Env: PHONE_TEST_OTP_ENVIRONMENTS (comma-separated, e.g. "local,testing")
+    |
+    */
+
+    'otp_test_code_environments' => array_values(array_filter(
+        array_map('trim', explode(',', (string) env('PHONE_TEST_OTP_ENVIRONMENTS', '')))
+    )),
+
+    /*
+    |--------------------------------------------------------------------------
     | Default Verification Provider
     |--------------------------------------------------------------------------
     |

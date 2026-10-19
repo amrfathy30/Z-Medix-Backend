@@ -43,7 +43,7 @@ class ProfilePhotoTest extends TestCase
         $user = $this->student();
         Sanctum::actingAs($user);
 
-        $response = $this->patch($this->url, [
+        $response = $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('avatar.jpg', 320, 320),
         ], ['Accept' => 'application/json'])->assertOk();
 
@@ -61,7 +61,7 @@ class ProfilePhotoTest extends TestCase
         $user = $this->student();
         Sanctum::actingAs($user);
 
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('avatar.jpg'),
         ], ['Accept' => 'application/json'])->assertOk();
 
@@ -77,13 +77,13 @@ class ProfilePhotoTest extends TestCase
         $user = $this->student();
         Sanctum::actingAs($user);
 
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('first.jpg'),
         ], ['Accept' => 'application/json'])->assertOk();
 
         $first = $user->fresh()->getFirstMedia(User::PROFILE_PHOTO_COLLECTION);
 
-        $second = $this->patch($this->url, [
+        $second = $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('second.jpg'),
         ], ['Accept' => 'application/json'])->assertOk()->json('data.profile_photo');
 
@@ -99,13 +99,13 @@ class ProfilePhotoTest extends TestCase
         $user = $this->student();
         Sanctum::actingAs($user);
 
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('avatar.jpg'),
         ], ['Accept' => 'application/json'])->assertOk();
 
         $before = $user->fresh()->getFirstMedia(User::PROFILE_PHOTO_COLLECTION);
 
-        $this->patchJson($this->url, ['institution' => 'Cairo University'])
+        $this->postJson($this->url, ['institution' => 'Cairo University'])
             ->assertOk()
             ->assertJsonPath('data.institution', 'Cairo University');
 
@@ -121,7 +121,7 @@ class ProfilePhotoTest extends TestCase
         $user = $this->student();
         Sanctum::actingAs($user);
 
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->create('notes.pdf', 100, 'application/pdf'),
         ], ['Accept' => 'application/json'])
             ->assertStatus(422)
@@ -136,7 +136,7 @@ class ProfilePhotoTest extends TestCase
         Sanctum::actingAs($user);
 
         // gif is a valid image but is not in config('media.image_mime_types').
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('animation.gif'),
         ], ['Accept' => 'application/json'])
             ->assertStatus(422)
@@ -152,7 +152,7 @@ class ProfilePhotoTest extends TestCase
 
         $limitKb = (int) config('media.max_image_size_kb');
 
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('huge.jpg')->size($limitKb + 1),
         ], ['Accept' => 'application/json'])
             ->assertStatus(422)
@@ -168,7 +168,7 @@ class ProfilePhotoTest extends TestCase
 
         $limitKb = (int) config('media.max_image_size_kb');
 
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('at-limit.jpg')->size($limitKb),
         ], ['Accept' => 'application/json'])->assertOk();
 
@@ -181,7 +181,7 @@ class ProfilePhotoTest extends TestCase
         $user = $this->student();
         Sanctum::actingAs($user);
 
-        $response = $this->patch($this->url, [
+        $response = $this->post($this->url, [
             'full_name' => 'Yousra Ahmed',
             'phone' => '+201234567890',
             'country_id' => $egypt->id,
@@ -206,7 +206,7 @@ class ProfilePhotoTest extends TestCase
         $user = $this->student();
         Sanctum::actingAs($user);
 
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('avatar.jpg'),
         ], ['Accept' => 'application/json'])->assertOk();
 
@@ -219,7 +219,7 @@ class ProfilePhotoTest extends TestCase
 
     public function test_photo_upload_requires_authentication(): void
     {
-        $this->patch($this->url, [
+        $this->post($this->url, [
             'profile_photo' => UploadedFile::fake()->image('avatar.jpg'),
         ], ['Accept' => 'application/json'])->assertStatus(401);
     }
