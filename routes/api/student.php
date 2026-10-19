@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Student\BookmarkController;
 use App\Http\Controllers\Api\Student\ChapterController;
 use App\Http\Controllers\Api\Student\ChapterPageController;
 use App\Http\Controllers\Api\Student\ChapterQuizController;
+use App\Http\Controllers\Api\Student\DashboardController;
 use App\Http\Controllers\Api\Student\FellowshipAnswerController;
 use App\Http\Controllers\Api\Student\FellowshipAvailabilityController;
 use App\Http\Controllers\Api\Student\FellowshipController;
@@ -28,6 +29,11 @@ use Illuminate\Support\Facades\Route;
 
 // Authenticated student endpoints. The group already carries `auth:sanctum`,
 // so every route registered here is student-only.
+
+// The home screen, in one read: what the student can continue, what is on
+// offer, and what they last did. A summary only — every section's items are
+// opened through the dedicated endpoints below, and nothing here writes.
+Route::get('dashboard', DashboardController::class)->name('dashboard');
 
 Route::get('report-cases', [ReportCaseController::class, 'index'])->name('report-cases.index');
 
