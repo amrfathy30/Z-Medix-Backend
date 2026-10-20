@@ -55,6 +55,18 @@ jobs:
             # reseeding when the countries table is already populated.
             php artisan db:seed --class=WorldSeeder --force
 
+            # Create/update the admin permissions and roles. New permissions
+            # (e.g. plans.*, subscriptions.*) only exist after this runs, and a
+            # policy checking a missing permission makes the dashboard return 500.
+            # It re-syncs the admin and content_manager roles to the lists in
+            # RolesPermissionsSeeder on every deploy, so permission changes made
+            # to those two roles from the dashboard are reset.
+            php artisan db:seed --class=RolesPermissionsSeeder --force
+
+            # Create the Basic/Premium/Ultra plans. Idempotent: only creates a
+            # plan whose slug is missing, never overwrites edited prices or features.
+            php artisan db:seed --class=PlansSeeder --force
+
             # Seed the demo Fellowship question banks.
             # FellowshipSeeder is idempotent and refuses to run when
             # APP_ENV=production.
