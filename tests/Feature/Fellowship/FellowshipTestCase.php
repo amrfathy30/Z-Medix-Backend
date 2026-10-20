@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Tests\Concerns\SubscribesStudents;
 use Tests\TestCase;
 
 /**
@@ -28,7 +29,7 @@ use Tests\TestCase;
  */
 abstract class FellowshipTestCase extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, SubscribesStudents;
 
     /**
      * Built workbooks, keyed by their contents, so one spreadsheet is written
@@ -92,9 +93,13 @@ abstract class FellowshipTestCase extends TestCase
         return $admin->refresh();
     }
 
+    /**
+     * An active student on a plan with every feature: the Fellowship routes are
+     * gated by the plan, so these tests need one to reach them.
+     */
     protected function student(): User
     {
-        return User::factory()->create(['status' => AccountStatus::Active]);
+        return $this->subscribedStudent();
     }
 
     /**
