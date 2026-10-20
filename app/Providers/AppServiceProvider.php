@@ -22,12 +22,16 @@ use App\Models\FellowshipQuestion;
 use App\Models\Page;
 use App\Models\PageSection;
 use App\Models\PageSectionItem;
+use App\Models\Plan;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\Quiz;
 use App\Models\ReportCase;
 use App\Models\StudentPrivateBook;
+use App\Models\StudentSubscription;
 use App\Models\Subject;
+use App\Models\SubscriptionPeriod;
+use App\Models\SubscriptionRequest;
 use App\Models\User;
 use App\Policies\BlogCategoryPolicy;
 use App\Policies\BlogPolicy;
@@ -45,11 +49,15 @@ use App\Policies\FellowshipQuestionPolicy;
 use App\Policies\PagePolicy;
 use App\Policies\PageSectionItemPolicy;
 use App\Policies\PageSectionPolicy;
+use App\Policies\PlanPolicy;
 use App\Policies\QuestionOptionPolicy;
 use App\Policies\QuestionPolicy;
 use App\Policies\QuizPolicy;
 use App\Policies\ReportCasePolicy;
+use App\Policies\StudentSubscriptionPolicy;
 use App\Policies\SubjectPolicy;
+use App\Policies\SubscriptionPeriodPolicy;
+use App\Policies\SubscriptionRequestPolicy;
 use App\Services\Fellowship\ExcelSpreadsheetReader;
 use App\Services\Phone\Providers\TwilioVerifyProvider;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
@@ -132,6 +140,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(FellowshipQuestion::class, FellowshipQuestionPolicy::class);
         Gate::policy(FellowshipFilter::class, FellowshipFilterPolicy::class);
         Gate::policy(FellowshipImport::class, FellowshipImportPolicy::class);
+        Gate::policy(Plan::class, PlanPolicy::class);
+        Gate::policy(SubscriptionRequest::class, SubscriptionRequestPolicy::class);
+        Gate::policy(StudentSubscription::class, StudentSubscriptionPolicy::class);
+        Gate::policy(SubscriptionPeriod::class, SubscriptionPeriodPolicy::class);
 
         Relation::enforceMorphMap([
             'user' => User::class,
@@ -155,6 +167,8 @@ class AppServiceProvider extends ServiceProvider
             // Holds the student's own uploaded PDF on the private disk, so it
             // owns media and has to be in the map too.
             'student_private_book' => StudentPrivateBook::class,
+            // Holds the payment screenshot on the private disk.
+            'subscription_period' => SubscriptionPeriod::class,
         ]);
     }
 }

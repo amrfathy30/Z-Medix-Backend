@@ -22,11 +22,12 @@ use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Tests\Concerns\SubscribesStudents;
 use Tests\TestCase;
 
 class ReportCaseTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, SubscribesStudents;
 
     private string $studentUrl = '/api/student/report-cases';
 
@@ -66,7 +67,7 @@ class ReportCaseTest extends TestCase
 
     private function student(): User
     {
-        return User::factory()->create(['status' => AccountStatus::Active]);
+        return $this->subscribedStudent();
     }
 
     // ─── Admin ──────────────────────────────────────────────────────────────

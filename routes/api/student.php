@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Student\FellowshipSessionResultController;
 use App\Http\Controllers\Api\Student\FellowshipSessionStateController;
 use App\Http\Controllers\Api\Student\HighlightController;
 use App\Http\Controllers\Api\Student\NoteController;
+use App\Http\Controllers\Api\Student\PlanController;
 use App\Http\Controllers\Api\Student\PrivateBookController;
 use App\Http\Controllers\Api\Student\PrivateBookPdfController;
 use App\Http\Controllers\Api\Student\QuizAnswerController;
@@ -24,16 +25,37 @@ use App\Http\Controllers\Api\Student\StudyResumeController;
 use App\Http\Controllers\Api\Student\StudySessionController;
 use App\Http\Controllers\Api\Student\SubjectController;
 use App\Http\Controllers\Api\Student\SubjectStatisticsController;
+use App\Http\Controllers\Api\Student\SubscriptionController;
+use App\Http\Controllers\Api\Student\SubscriptionRequestController;
 use Illuminate\Support\Facades\Route;
 
 // Authenticated student endpoints. The group already carries `auth:sanctum`,
 // so every route registered here is student-only.
 
-Route::get('report-cases', [ReportCaseController::class, 'index'])->name('report-cases.index');
+// Plans and the student's own subscription. Deliberately outside every
+// `feature:*` gate below: a student with no plan reaches these, and only these,
+// which is how they find a plan, ask for it and see where the request stands.
+Route::get('plans', [PlanController::class, 'index'])->name('plans.index');
+Route::get('subscription', [SubscriptionController::class, 'show'])->name('subscription.show');
+Route::post('subscription-requests', [SubscriptionRequestController::class, 'store'])->name('subscription-requests.store');
+
+// Everything below is gated by the student's plan. The `feature` middleware
+// refuses with 403 `SUBSCRIPTION_REQUIRED` when there is no active subscription
+// and 403 `FEATURE_NOT_IN_PLAN` when the plan lacks the feature, so a route here
+// is never reachable on frontend state alone.
+//
+//   case_report   -> Case Report
+//   library       -> study content and the student's own private books
+//   question_bank -> Fellowships
+//   ai            -> no routes yet; the AI module's routes will use feature:ai
+
+Route::get('report-cases', [ReportCaseController::class, 'index'])
+    ->middleware('feature:case_report')
+    ->name('report-cases.index');
 
 // The study flow. Every route validates that the requested content is
 // accessible to this student right now; navigation itself is the frontend's.
-Route::prefix('study')->name('study.')->group(function (): void {
+Route::prefix('study')->middleware('feature:library')->name('study.')->group(function (): void {
     // Study time tracking only. Sessions are never auto-closed, and more than
     // one may be open at a time.
     Route::post('sessions', [StudySessionController::class, 'store'])->name('sessions.store');
@@ -110,7 +132,7 @@ Route::prefix('study')->name('study.')->group(function (): void {
 // Fellowship, since a session stays answerable on its own terms, and questions
 // are addressed by their session row rather than by the live question — so a
 // session survives the question behind it being edited or deleted.
-Route::prefix('fellowships')->name('fellowships.')->group(function (): void {
+Route::prefix('fellowships')->middleware('feature:question_bank')->name('fellowships.')->group(function (): void {
     // The Question Bank screen lists Fellowships, not questions.
     Route::get('/', [FellowshipController::class, 'index'])->name('index');
     Route::get('{fellowship}', [FellowshipController::class, 'show'])->name('show');
@@ -124,7 +146,7 @@ Route::prefix('fellowships')->name('fellowships.')->group(function (): void {
     Route::post('{fellowship}/sessions', [FellowshipSessionController::class, 'store'])->name('sessions.store');
 });
 
-Route::prefix('fellowship-sessions')->name('fellowship-sessions.')->group(function (): void {
+Route::prefix('fellowship-sessions')->middleware('feature:question_bank')->name('fellowship-sessions.')->group(function (): void {
     Route::get('{fellowshipQuizSession}', [FellowshipSessionController::class, 'show'])->name('show');
     Route::get('{fellowshipQuizSession}/result', FellowshipSessionResultController::class)->name('result');
 
@@ -143,7 +165,7 @@ Route::prefix('fellowship-sessions')->name('fellowship-sessions.')->group(functi
 //
 // The PDF lives on the private disk, so the download route below is the only
 // way it can be read: there is no public URL to a student's upload.
-Route::prefix('private-books')->name('private-books.')->group(function (): void {
+Route::prefix('private-books')->middleware('feature:library')->name('private-books.')->group(function (): void {
     Route::get('/', [PrivateBookController::class, 'index'])->name('index');
     Route::post('/', [PrivateBookController::class, 'store'])->name('store');
     Route::get('{privateBook}', [PrivateBookController::class, 'show'])->name('show');

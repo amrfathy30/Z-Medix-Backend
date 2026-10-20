@@ -120,6 +120,20 @@ class RolesPermissionsSeeder extends Seeder
             'report_cases.update' => ['display_name_ar' => 'تعديل الحالات', 'display_name_en' => 'Update Report Cases'],
             'report_cases.delete' => ['display_name_ar' => 'حذف الحالات', 'display_name_en' => 'Delete Report Cases'],
 
+            // Plans and subscriptions. `plans.*` is pricing and features;
+            // `subscriptions.*` covers the whole manual-payment workflow
+            // (requests, subscriptions and the periods/invoices recorded on
+            // them), since the person taking payment on WhatsApp does all of it.
+            'plans.view' => ['display_name_ar' => 'عرض الباقات', 'display_name_en' => 'View Plans'],
+            'plans.create' => ['display_name_ar' => 'إنشاء الباقات', 'display_name_en' => 'Create Plans'],
+            'plans.update' => ['display_name_ar' => 'تعديل الباقات', 'display_name_en' => 'Update Plans'],
+            'plans.delete' => ['display_name_ar' => 'حذف الباقات', 'display_name_en' => 'Delete Plans'],
+
+            'subscriptions.view' => ['display_name_ar' => 'عرض الاشتراكات', 'display_name_en' => 'View Subscriptions'],
+            'subscriptions.create' => ['display_name_ar' => 'إنشاء الاشتراكات', 'display_name_en' => 'Create Subscriptions'],
+            'subscriptions.update' => ['display_name_ar' => 'تعديل الاشتراكات', 'display_name_en' => 'Update Subscriptions'],
+            'subscriptions.delete' => ['display_name_ar' => 'حذف الاشتراكات', 'display_name_en' => 'Delete Subscriptions'],
+
             // Contact messages
             'contact_messages.view' => ['display_name_ar' => 'عرض الرسائل', 'display_name_en' => 'View Contact Messages'],
             'contact_messages.update' => ['display_name_ar' => 'تعديل الرسائل', 'display_name_en' => 'Update Contact Messages'],
@@ -179,6 +193,12 @@ class RolesPermissionsSeeder extends Seeder
             'report_cases.create',
             'report_cases.update',
             'report_cases.delete',
+            // The admin role takes the payments: it handles requests and
+            // records periods, but only reads the plans' pricing.
+            'plans.view',
+            'subscriptions.view',
+            'subscriptions.create',
+            'subscriptions.update',
         ]);
 
         $contentManager->syncPermissions([
