@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Middleware\EnsurePlanFeature;
 use App\Http\Middleware\SetPublicLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -30,7 +32,18 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // `feature:library` etc.: gates a student route behind a plan feature.
+        $middleware->alias([
+            'feature' => EnsurePlanFeature::class,
+        ]);
+
+        // Decide the plan before route-model binding runs, so a student without
+        // the feature gets the same 403 for every id rather than a 404 for ids
+        // that do not exist, which would reveal which ones do.
+        $middleware->prependToPriorityList(
+            before: SubstituteBindings::class,
+            prepend: EnsurePlanFeature::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
