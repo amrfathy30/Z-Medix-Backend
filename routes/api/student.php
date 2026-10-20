@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\FcmTokenController;
+use App\Http\Controllers\Api\FcmTopicController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Student\BookController;
 use App\Http\Controllers\Api\Student\BookmarkController;
 use App\Http\Controllers\Api\Student\ChapterController;
@@ -158,3 +161,16 @@ Route::prefix('private-books')->name('private-books.')->group(function (): void 
 
     Route::get('{privateBook}/pdf', PrivateBookPdfController::class)->name('pdf');
 });
+
+// Device (FCM) Tokens & Topics
+Route::post('fcm-tokens', [FcmTokenController::class, 'store'])->name('fcm-tokens.store');
+Route::delete('fcm-tokens', [FcmTokenController::class, 'destroy'])->name('fcm-tokens.destroy');
+Route::post('fcm-tokens/topic/subscribe', [FcmTopicController::class, 'subscribe'])->name('fcm-tokens.topic.subscribe');
+Route::post('fcm-tokens/topic/unsubscribe', [FcmTopicController::class, 'unsubscribe'])->name('fcm-tokens.topic.unsubscribe');
+
+// Notifications Center
+Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+Route::patch('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+Route::patch('notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+
