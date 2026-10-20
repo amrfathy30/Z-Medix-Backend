@@ -287,7 +287,7 @@ The currently confirmed notification events are:
 - Subscription activation.
 - Subscription expiration.
 
-The Subscription business model itself is not yet defined in this core document.
+The Subscription business model is defined in [Appendix A](#appendix-a--plans-and-subscriptions). Sending these notifications is not implemented yet.
 
 ## 20. Backend Responsibility
 
@@ -314,7 +314,7 @@ Security-sensitive rules must never depend only on frontend state.
 - Do not expose correct answers before answer submission.
 - Reuse one quiz engine for Subject and Fellowship attempts.
 - Persist unfinished attempt/session progress on the server.
-- Keep Subscription logic isolated until its business rules are approved.
+- Subscription rules are approved and live in Appendix A; do not extend them beyond what it states.
 - If a task requires an undefined business rule, flag it instead of guessing.
 
 ## 22. Future Appendices
@@ -322,3 +322,42 @@ Security-sensitive rules must never depend only on frontend state.
 This file represents the confirmed core business rules.
 
 Additional appendices will be added after the remaining business decisions are clarified and approved. Those appendices may extend this document, but unconfirmed behavior must not be treated as implementation truth before approval.
+
+## Appendix A — Plans and Subscriptions
+
+Approved by the product owner. Student-facing API and admin workflow details are
+in `docs/subscriptions-api.md`.
+
+### Plans
+
+| Plan | Features |
+|---|---|
+| Basic | Library, Question Bank |
+| Premium | Library, Question Bank, Case Report, AI with limited credits |
+| Ultra | Library, Question Bank, Case Report, AI with unlimited credits |
+
+- A plan is a set of features plus limits. The only limit today is the AI credit
+  allowance (a number of credits, or unlimited).
+- Every plan has a monthly and a yearly price; a plan may be sold on one cycle only.
+- The admin creates and edits plans in the dashboard.
+- Library means the study content (subjects, chapters, books, quizzes) and the
+  student's own uploaded books. Question Bank is the Fellowship module. Case
+  Report is the report cases.
+
+### Access
+
+- A student sees and can use only the features of their active plan.
+- A student with no active subscription (never subscribed, expired or cancelled)
+  gets no content. They can only see the plans and send a request.
+- The backend enforces this; the apps hiding a feature is never the control.
+
+### Payment and activation
+
+- Payment is manual, over WhatsApp. The student does not upload proof.
+- The student sends a request for a plan and a billing cycle.
+- The admin takes the payment on WhatsApp, then records a payment period in the
+  dashboard with the payment screenshot. Recording the period activates the plan.
+- A subscription has many periods (one per payment). Renewing adds a period.
+- A monthly period lasts one month, a yearly period twelve months.
+- The admin can cancel a subscription, which withdraws access immediately.
+

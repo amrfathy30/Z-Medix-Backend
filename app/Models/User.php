@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -80,6 +81,25 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function fcmTokens(): MorphMany
     {
         return $this->morphMany(FcmToken::class, 'tokenable');
+    }
+
+    /**
+     * The student's subscription, if one has ever been recorded. Named apart
+     * from Cashier's `Billable::subscription()`, which is the unused Stripe flow.
+     */
+    public function studentSubscription(): HasOne
+    {
+        return $this->hasOne(StudentSubscription::class);
+    }
+
+    /**
+     * Plan requests the student has sent, newest first.
+     */
+    public function subscriptionRequests(): HasMany
+    {
+        return $this->hasMany(SubscriptionRequest::class)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     public function country(): BelongsTo

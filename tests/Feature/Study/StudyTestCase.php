@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Study;
 
-use App\Enums\AccountStatus;
 use App\Models\Chapter;
 use App\Models\ChapterPage;
 use App\Models\Question;
@@ -12,6 +11,7 @@ use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
+use Tests\Concerns\SubscribesStudents;
 use Tests\TestCase;
 
 /**
@@ -21,13 +21,17 @@ use Tests\TestCase;
  */
 abstract class StudyTestCase extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, SubscribesStudents;
 
     protected string $studyUrl = '/api/student/study';
 
+    /**
+     * An active student on a plan with every feature: the study routes are
+     * gated by the plan, so the flow tests need one to reach them.
+     */
     protected function student(): User
     {
-        return User::factory()->create(['status' => AccountStatus::Active]);
+        return $this->subscribedStudent();
     }
 
     /**

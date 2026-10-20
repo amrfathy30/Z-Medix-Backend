@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             SuperAdminSeeder::class,
             CmsSeeder::class,
             PageSectionSeeder::class,
+            PlansSeeder::class,
         ]);
     }
 }

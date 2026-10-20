@@ -150,6 +150,9 @@ class CmsSeeder extends Seeder
             ['key' => 'contact_email', 'value' => 'info@example.test', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Primary contact email'],
             ['key' => 'support_email', 'value' => 'support@example.test', 'value_type' => SettingValueType::String, 'group' => 'general', 'is_public' => true, 'description' => 'Customer support email'],
 
+            // ── Contact ──────────────────────────────────────────────────────
+            ['key' => 'whatsapp_number', 'value' => '', 'value_type' => SettingValueType::String, 'group' => 'contact', 'is_public' => true, 'description' => 'WhatsApp number students contact to pay for a plan (international format)'],
+
             // ── Home ─────────────────────────────────────────────────────────
             ['key' => 'hero_title', 'value' => 'Welcome', 'value_type' => SettingValueType::String, 'group' => 'home', 'is_public' => true, 'description' => 'Main hero heading on the home page'],
             ['key' => 'hero_subtitle', 'value' => 'A starter platform ready for your content', 'value_type' => SettingValueType::String, 'group' => 'home', 'is_public' => true, 'description' => 'Hero subheading'],
