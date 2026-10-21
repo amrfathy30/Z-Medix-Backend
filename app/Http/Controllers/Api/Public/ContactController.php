@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Public;
 
+use App\Events\ContactMessageReceived;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Public\ContactRequest;
 use App\Models\ContactMessage;
@@ -14,7 +15,9 @@ class ContactController extends Controller
 
     public function store(ContactRequest $request): JsonResponse
     {
-        ContactMessage::create($request->validated());
+        $contactMessage = ContactMessage::create($request->validated());
+
+        event(new ContactMessageReceived($contactMessage));
 
         return $this->successResponse(null, 'Your message has been received. We will get back to you shortly.', 201);
     }

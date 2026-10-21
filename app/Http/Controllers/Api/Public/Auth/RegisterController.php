@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Public\Auth;
 
 use App\Enums\AccountStatus;
+use App\Events\StudentRegistered;
 use App\Exceptions\Phone\InvalidPhoneException;
 use App\Exceptions\Phone\MaxPhoneNumbersReachedException;
 use App\Exceptions\Phone\PhoneAlreadyExistsException;
@@ -77,6 +78,8 @@ class RegisterController extends Controller
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
         ]);
+
+        event(new StudentRegistered($user));
 
         return $this->successResponse([
             'email' => $user->email,

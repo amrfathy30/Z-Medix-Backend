@@ -111,4 +111,12 @@ return [
         'created_at' => 'Registered At',
         'token' => 'Token',
     ],
+
+    // Admin Notifications
+    'admin' => [
+        'contact_title' => 'New Contact Message',
+        'contact_body' => 'New message from :name: :subject',
+        'subscription_title' => 'New Student Registration',
+        'subscription_body' => ':name has registered on the platform.',
+    ],
 ];

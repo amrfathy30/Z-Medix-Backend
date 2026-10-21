@@ -111,4 +111,12 @@ return [
         'created_at' => 'تاريخ التسجيل',
         'token' => 'رمز الجهاز (Token)',
     ],
+
+    // Admin Notifications
+    'admin' => [
+        'contact_title' => 'رسالة تواصل جديدة',
+        'contact_body' => 'رسالة جديدة من :name: :subject',
+        'subscription_title' => 'اشتراك طالب جديد',
+        'subscription_body' => 'قام :name بالتسجيل في المنصة.',
+    ],
 ];

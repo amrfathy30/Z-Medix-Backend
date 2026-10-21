@@ -239,6 +239,7 @@ class SendNotificationPage extends Page
                                 body: $body,
                                 actionUrl: $actionUrl,
                                 extra: $extraData,
+                                type: 'announcement',
                             )
                         );
                         $recipientsCount += $users->count();
@@ -263,6 +264,7 @@ class SendNotificationPage extends Page
                             body: $body,
                             actionUrl: $actionUrl,
                             extra: $extraData,
+                            type: 'announcement',
                         )
                     );
                 }

@@ -20,7 +20,7 @@ class NotificationResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'type' => $this->type,
+            'type' => $data['type'] ?? $data['category'] ?? 'general',
             'category' => $data['category'] ?? null,
             'title' => $this->renderText($data, 'title', $locale),
             'body' => $this->renderText($data, 'body', $locale) ?? ($data['message'] ?? null),
