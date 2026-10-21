@@ -33,6 +33,7 @@ class SubscriptionController extends Controller
         $subscription = $this->access->subscriptionFor($student);
         $status = $subscription?->status() ?? SubscriptionStatus::None;
         $period = $status === SubscriptionStatus::Active ? $subscription->currentPeriod() : null;
+        $price = $period === null ? null : $period->plan->priceFor($period->billing_cycle);
 
         $pending = $student->subscriptionRequests()
             ->pending()
@@ -45,6 +46,11 @@ class SubscriptionController extends Controller
                 'id' => $period->plan->id,
                 'slug' => $period->plan->slug,
                 'name' => $period->plan->name,
+                // A plan with no description in the requested language
+                // translates to an empty string; the app wants nothing at all.
+                'description' => blank($period->plan->description) ? null : $period->plan->description,
+                'price' => $price === null ? null : (float) $price,
+                'currency' => $period->plan->currency,
             ],
             'billing_cycle' => $period?->billing_cycle->value,
             'starts_at' => $period?->starts_at->toIso8601String(),

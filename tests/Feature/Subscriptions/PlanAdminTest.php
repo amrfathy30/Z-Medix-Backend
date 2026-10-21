@@ -63,6 +63,44 @@ class PlanAdminTest extends SubscriptionTestCase
         $this->assertFalse($plan->limitFor(PlanFeature::Ai)->is_unlimited);
     }
 
+    public function test_an_admin_saves_and_then_changes_a_plans_description(): void
+    {
+        Livewire::actingAs($this->superAdmin(), 'admin')
+            ->test(CreatePlan::class)
+            ->fillForm($this->validPlan([
+                'description' => ['en' => 'Everything a first year needs.', 'ar' => 'كل ما يحتاجه طالب السنة الأولى.'],
+            ]))
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $plan = Plan::query()->where('slug', 'gold')->sole();
+
+        $this->assertSame('Everything a first year needs.', $plan->getTranslation('description', 'en'));
+        $this->assertSame('كل ما يحتاجه طالب السنة الأولى.', $plan->getTranslation('description', 'ar'));
+
+        Livewire::actingAs($this->superAdmin(), 'admin')
+            ->test(EditPlan::class, ['record' => $plan->id])
+            ->fillForm(['description' => ['en' => 'Now with case reports.', 'ar' => 'كل ما يحتاجه طالب السنة الأولى.']])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('Now with case reports.', $plan->refresh()->getTranslation('description', 'en'));
+    }
+
+    public function test_a_plan_does_not_need_a_description(): void
+    {
+        Livewire::actingAs($this->superAdmin(), 'admin')
+            ->test(CreatePlan::class)
+            ->fillForm($this->validPlan())
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $plan = Plan::query()->where('slug', 'gold')->sole();
+
+        $this->assertEmpty($plan->getTranslation('description', 'en'));
+        $this->assertEmpty($plan->getTranslation('description', 'ar'));
+    }
+
     public function test_a_plan_can_be_unlimited_on_ai(): void
     {
         Livewire::actingAs($this->superAdmin(), 'admin')

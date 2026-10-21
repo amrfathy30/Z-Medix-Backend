@@ -18,6 +18,8 @@ class SubscriptionRequestResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $price = $this->plan->priceFor($this->billing_cycle);
+
         return [
             'id' => $this->id,
             'status' => $this->status->value,
@@ -26,6 +28,9 @@ class SubscriptionRequestResource extends JsonResource
                 'id' => $this->plan->id,
                 'slug' => $this->plan->slug,
                 'name' => $this->plan->name,
+                'description' => blank($this->plan->description) ? null : $this->plan->description,
+                'price' => $price === null ? null : (float) $price,
+                'currency' => $this->plan->currency,
             ],
             'created_at' => $this->created_at?->toIso8601String(),
         ];
