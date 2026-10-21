@@ -119,4 +119,14 @@ return [
         'subscription_title' => 'New Student Registration',
         'subscription_body' => ':name has registered on the platform.',
     ],
+
+    // Student Notifications
+    'student' => [
+        'subscription_approved_title' => 'Subscription Activated!',
+        'subscription_approved_body' => 'Your subscription to :plan has been approved and activated. Enjoy learning!',
+        'subscription_rejected_title' => 'Subscription Request Update',
+        'subscription_rejected_body' => 'Your request for :plan could not be approved: :reason',
+        'contact_replied_title' => 'Response to Your Inquiry',
+        'contact_replied_body' => 'Our support team has responded to your inquiry: :subject',
+    ],
 ];

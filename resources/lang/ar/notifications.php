@@ -119,4 +119,14 @@ return [
         'subscription_title' => 'اشتراك طالب جديد',
         'subscription_body' => 'قام :name بالتسجيل في المنصة.',
     ],
+
+    // Student Notifications
+    'student' => [
+        'subscription_approved_title' => 'تم تفعيل اشتراكك بنجاح!',
+        'subscription_approved_body' => 'تمت الموافقة على اشتراكك في باقة :plan وتفعيله بنجاح. نتمنى لك تجربة موفقة!',
+        'subscription_rejected_title' => 'تحديث بشأن طلب الاشتراك',
+        'subscription_rejected_body' => 'تعذر قبول طلب اشتراكك في باقة :plan: :reason',
+        'contact_replied_title' => 'تم الرد على استفسارك',
+        'contact_replied_body' => 'قام فريق الدعم بالرد على استفسارك: :subject',
+    ],
 ];
