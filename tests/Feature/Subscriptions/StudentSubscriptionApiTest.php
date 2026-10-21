@@ -119,6 +119,64 @@ class StudentSubscriptionApiTest extends SubscriptionTestCase
         $this->assertSame(['library', 'question_bank'], collect($response->json('data.features'))->pluck('key')->all());
     }
 
+    public function test_the_subscription_carries_the_plans_description_and_the_price_of_the_paid_cycle(): void
+    {
+        $plan = Plan::factory()->basic()->create([
+            'description' => ['en' => 'Library and question bank.', 'ar' => 'المكتبة وبنك الأسئلة.'],
+        ]);
+
+        $this->actingAsStudent($this->subscribedStudent($plan));
+
+        $this->getJson(self::SUBSCRIPTION)
+            ->assertOk()
+            ->assertJsonPath('data.billing_cycle', 'monthly')
+            ->assertJsonPath('data.plan.slug', 'basic')
+            ->assertJsonPath('data.plan.name', 'Basic')
+            ->assertJsonPath('data.plan.description', 'Library and question bank.')
+            ->assertJsonPath('data.plan.price', 5.99)
+            ->assertJsonPath('data.plan.currency', 'USD');
+    }
+
+    public function test_a_yearly_subscription_is_priced_on_the_yearly_price(): void
+    {
+        $student = $this->unsubscribedStudent();
+        $subscription = StudentSubscription::factory()->for($student, 'user')->create();
+        SubscriptionPeriodFactory::new()->yearly()->create([
+            'student_subscription_id' => $subscription->id,
+            'plan_id' => Plan::factory()->basic()->create()->id,
+        ]);
+
+        $this->actingAsStudent($student);
+
+        $this->getJson(self::SUBSCRIPTION)
+            ->assertOk()
+            ->assertJsonPath('data.billing_cycle', 'yearly')
+            ->assertJsonPath('data.plan.price', 59.99);
+    }
+
+    public function test_a_plan_without_a_description_reports_null(): void
+    {
+        $this->actingAsStudent($this->subscribedStudent(Plan::factory()->basic()->create(['description' => null])));
+
+        $this->getJson(self::SUBSCRIPTION)
+            ->assertOk()
+            ->assertJsonPath('data.plan.description', null)
+            ->assertJsonPath('data.plan.price', 5.99);
+    }
+
+    public function test_the_subscription_is_returned_in_the_requested_language(): void
+    {
+        $plan = Plan::factory()->basic()->create([
+            'description' => ['en' => 'Library and question bank.', 'ar' => 'المكتبة وبنك الأسئلة.'],
+        ]);
+
+        $this->actingAsStudent($this->subscribedStudent($plan));
+
+        $this->getJson(self::SUBSCRIPTION.'?lang=ar')
+            ->assertOk()
+            ->assertJsonPath('data.plan.description', 'المكتبة وبنك الأسئلة.');
+    }
+
     public function test_the_subscription_reports_when_it_ends_and_how_long_is_left(): void
     {
         $student = $this->unsubscribedStudent();
