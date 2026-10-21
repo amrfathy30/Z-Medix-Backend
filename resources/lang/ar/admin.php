@@ -2,6 +2,30 @@
 
 return [
 
+    'dashboard' => [
+        'title' => 'لوحة التحكم',
+        'total_students' => 'الطلاب المسجلين',
+        'new_students_30_days' => '+:count خلال آخر 30 يوماً',
+        'study_sessions' => 'جلسات المذاكرة',
+        'active_study_sessions' => ':count جلسة نشطة حالياً',
+        'fellowship_questions' => 'أسئلة الزمالات',
+        'fellowships_count' => 'موزعة على :count زمالة وتخصص',
+        'pending_contact' => 'رسائل تواصل معلقة',
+        'contact_needs_review' => 'تحتاج إلى مراجعة والرد',
+        'contact_all_cleared' => 'تم الرد على جميع الرسائل',
+        'student_growth_title' => 'نمو تسجيلات الطلاب',
+        'student_growth_subheading' => 'معدل انضمام الطلاب خلال آخر 14 يوماً',
+        'student_growth_dataset' => 'الطلاب الجدد',
+        'latest_inquiries_title' => 'أحدث رسائل التواصل الواردة',
+        'view_all_messages' => 'عرض جميع الرسائل',
+        'col_sender' => 'المرسل',
+        'col_email' => 'البريد الإلكتروني',
+        'col_subject' => 'الموضوع',
+        'col_status' => 'الحالة',
+        'col_date' => 'التاريخ',
+        'view_message' => 'معاينة',
+    ],
+
     'access_management' => [
         'title' => 'إدارة الصلاحيات',
         'navigation_label' => 'الصلاحيات',
