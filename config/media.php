@@ -39,6 +39,15 @@ return [
         'image/webp',
     ],
 
+    // Payment screenshots are raster images only: unlike the shared image list
+    // this leaves SVG out, since the proof is served inline to admins and an SVG
+    // can carry script.
+    'payment_proof_mime_types' => [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+    ],
+
     'document_mime_types' => [
         'application/pdf',
     ],

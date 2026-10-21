@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\AccessManagementPage;
 use App\Filament\Pages\Auth\EditProfile;
+use App\Http\Controllers\Admin\SubscriptionPeriodProofController;
 use App\Http\Middleware\SetAdminLocale;
 use App\Models\Setting;
 use Filament\Http\Middleware\Authenticate;
@@ -24,6 +25,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
@@ -48,6 +50,12 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
+            // Payment screenshots are on a private disk; this is how an admin
+            // opens one. Runs behind the panel's login (see the controller).
+            ->authenticatedRoutes(function (): void {
+                Route::get('subscription-periods/{period}/proof', SubscriptionPeriodProofController::class)
+                    ->name('subscription-periods.proof');
+            })
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
