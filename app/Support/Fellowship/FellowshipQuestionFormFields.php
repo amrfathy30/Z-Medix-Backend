@@ -102,10 +102,13 @@ final class FellowshipQuestionFormFields
                 ->all() ?? [])
             ->searchable()
             ->required()
+            // Never disabled: a required field the admin cannot fill is a dead
+            // end, and the form is only reachable once the Fellowship has a
+            // classification to choose from. The hint is kept for the moment
+            // between designating the filter and adding its first value.
             ->helperText(fn (): ?string => $fellowship->performance_filter_id === null
-                ? __('admin.fellowship.performance_topic_needs_import')
-                : null)
-            ->disabled(fn (): bool => $fellowship->performance_filter_id === null);
+                ? __('admin.fellowship.performance_topic_needs_filter')
+                : null);
     }
 
     /**

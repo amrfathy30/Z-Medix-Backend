@@ -261,37 +261,91 @@ Filters are per-fellowship; another fellowship's classifications never appear
 here. `question_time_limit_seconds` is the limit a timed session would capture,
 shown so the form can state it before the student decides.
 
+The three figures are different things and none of them replaces another:
+
+| Key | Meaning |
+|---|---|
+| `is_performance` | Marks the fellowship's required classification. Exactly one filter carries it, every question in the bank holds one of its values, and Topic Performance is reported by those values. A fellowship whose classification has not been designated yet has no flagged filter. |
+| `total_questions` | The whole bank's size, before any filtering and without regard to this student. |
+| `max_question_count` | The configurable system ceiling `question_count` is validated against, on counting and on generation alike. |
+
+`available_questions` from the next endpoint is the third quantity: the filtered,
+per-student eligible count. The form's effective maximum for its size field is
+therefore `min(max_question_count, available_questions)`.
+
 ---
 
 ## `POST /api/student/fellowships/{fellowship}/available-questions`
 
 How many questions a set of filters would actually yield — counted with exactly
-the query generation draws from, so the two cannot disagree.
+the query generation draws from, so the two cannot disagree. Nothing is created.
 
-**Request**
+Called whenever the Generate Session form's filters change, so the student is
+told what their selection holds before they commit.
+
+**Request** — the same narrowings generation takes, and none of its
+requirements.
+
+| Field | Required | Notes |
+|---|---|---|
+| `title` | **no** | Accepted and ignored. Counting names nothing; a client still sending one keeps working. |
+| `question_count` | no | Send it to ask whether that size could be generated; omit it to ask only how many questions the filters hold. Bounded by 1…`max_question_count` when sent. |
+| `difficulties[]` | no | Any of `easy`, `medium`, `hard`. Omitted means all. |
+| `question_status` | no | `all` (default), `answered`, `unanswered`. |
+| `filters` | no | Object keyed by **filter id**, each an array of **value ids**. Same algebra as generation: OR within a filter, AND across filters, an omitted or empty filter means All. |
 
 ```json
 {
-  "title": "Preview",
-  "question_count": 20,
-  "difficulties": ["easy", "hard"],
-  "question_status": "unanswered",
-  "filters": { "3": [9, 10] }
+  "filters": { "2": [2], "1": [1], "3": [5] },
+  "difficulties": ["hard"],
+  "question_status": "all",
+  "question_count": 5
 }
 ```
 
-`title` and `question_count` are required by the shared request object;
-`question_count` is echoed back so the form can compare.
-
-**Response**
+**Response, with a count** — `200`:
 
 ```json
 {
   "success": true,
   "message": "Success.",
-  "data": { "available_questions": 37, "requested_question_count": 20, "can_generate": true }
+  "data": { "available_questions": 7, "requested_question_count": 5, "can_generate": true }
 }
 ```
+
+**Response, without one** — `200`. No count is invented:
+
+```json
+{
+  "success": true,
+  "message": "Success.",
+  "data": { "available_questions": 7, "requested_question_count": null, "can_generate": true }
+}
+```
+
+- `available_questions` — the filtered, per-student eligible count, right now.
+- `requested_question_count` — the `question_count` that was sent, echoed back
+  unchanged, or `null` when none was.
+- `can_generate` — with a count, `available_questions >= question_count`. Without
+  one, whether a session could be generated at all, i.e.
+  `available_questions >= min_question_count` (1). An empty pool therefore
+  reports `available_questions: 0` and `can_generate: false`.
+
+**Validation failure** — `422`, Laravel's standard shape. A filter value from
+another fellowship, an unknown difficulty, or a `question_count` outside
+1…`max_question_count`. A missing `title` is no longer one of them:
+
+```json
+{
+  "message": "One of the selected filter values does not belong to this fellowship.",
+  "errors": {
+    "filters.3.0": ["One of the selected filter values does not belong to this fellowship."]
+  }
+}
+```
+
+**Unavailable fellowship** — `404` with `code: FELLOWSHIP_UNAVAILABLE`, as
+everywhere else.
 
 ---
 
@@ -332,7 +386,14 @@ Filter semantics:
 - Only filter values belonging to this fellowship are accepted (`422`
   otherwise).
 
+`title` and `question_count` stay required here: a session is named and of a
+fixed size. Only the counting endpoint above dropped them.
+
 **Response** — `201`, the same shape as `GET /fellowship-sessions/{id}` below.
+It carries the session, its full question list and the question the student
+starts on. The first question's clock starts with the session — its
+`activated_at` is the session's own `started_at` — so the frontend shows that
+question as soon as this response arrives, with no further call.
 
 **Insufficient pool** — `422`:
 
