@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ContactMessageResource\Pages;
 
+use App\Events\ContactMessageReplied;
 use App\Filament\Resources\ContactMessageResource;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
@@ -37,5 +38,12 @@ class EditContactMessage extends EditRecord
         return Notification::make()
             ->title(__('admin.cms.contact_message_updated'))
             ->success();
+    }
+
+    protected function afterSave(): void
+    {
+        if (filled($this->record->admin_reply)) {
+            event(new ContactMessageReplied($this->record));
+        }
     }
 }

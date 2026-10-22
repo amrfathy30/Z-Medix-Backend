@@ -4,6 +4,8 @@ namespace App\Services\Subscription;
 
 use App\Enums\BillingCycle;
 use App\Enums\SubscriptionRequestStatus;
+use App\Events\SubscriptionApproved;
+use App\Events\SubscriptionRejected;
 use App\Exceptions\Subscription\SubscriptionException;
 use App\Models\Admin;
 use App\Models\Plan;
@@ -146,6 +148,10 @@ class SubscriptionService
 
             return $period;
         });
+
+        event(new SubscriptionApproved($payment->student, $payment->plan, $period));
+
+        return $period;
     }
 
     /**
@@ -153,7 +159,7 @@ class SubscriptionService
      */
     public function rejectRequest(SubscriptionRequest $request, ?Admin $admin = null, ?string $note = null): SubscriptionRequest
     {
-        return DB::transaction(function () use ($request, $admin, $note): SubscriptionRequest {
+        $updatedRequest = DB::transaction(function () use ($request, $admin, $note): SubscriptionRequest {
             $request = SubscriptionRequest::query()->lockForUpdate()->findOrFail($request->getKey());
 
             if (! $request->isPending()) {
@@ -169,6 +175,13 @@ class SubscriptionService
 
             return $request;
         });
+
+        $updatedRequest->loadMissing(['user', 'plan']);
+        if ($updatedRequest->user !== null && $updatedRequest->plan !== null) {
+            event(new SubscriptionRejected($updatedRequest->user, $updatedRequest->plan, $note));
+        }
+
+        return $updatedRequest;
     }
 
     /**

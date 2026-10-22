@@ -48,6 +48,12 @@ class NotificationApiTest extends TestCase
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('meta.total', 2);
 
+        // Also test root /api/notifications endpoint (identical to Kanun Network structure)
+        $rootResponse = $this->getJson('/api/notifications');
+        $rootResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(2, 'data');
+
         $countResponse = $this->getJson($this->unreadCountUrl);
         $countResponse->assertOk()
             ->assertJsonPath('data.unread_count', 2);

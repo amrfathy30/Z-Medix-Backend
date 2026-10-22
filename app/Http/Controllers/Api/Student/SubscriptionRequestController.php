@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Student;
 
+use App\Events\StudentSubscribed;
 use App\Exceptions\Subscription\SubscriptionException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Student\StoreSubscriptionRequestRequest;
@@ -36,6 +37,8 @@ class SubscriptionRequestController extends Controller
         } catch (SubscriptionException $exception) {
             return $this->studyErrorResponse($exception);
         }
+
+        event(new StudentSubscribed($request->user(), $plan->name));
 
         $subscriptionRequest->load('plan');
 
