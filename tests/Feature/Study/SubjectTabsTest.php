@@ -5,6 +5,9 @@ namespace Tests\Feature\Study;
 use App\Enums\StudyProgressStatus;
 use App\Models\Book;
 use App\Models\BookPage;
+use App\Models\QuizAttempt;
+use App\Models\StudentChapterProgress;
+use App\Models\StudentNote;
 use App\Models\StudySession;
 use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\Sanctum;
@@ -185,6 +188,102 @@ class SubjectTabsTest extends StudyTestCase
         $this->assertTrue($activity->contains(
             fn (array $row): bool => $row['type'] === 'quiz_completed' && (float) $row['score'] === 100.0,
         ));
+    }
+
+    /**
+     * The regression behind "Call to a member function getKey() on array": a
+     * student with no completed chapters still has their quizzes and notes
+     * reported, because the empty first source no longer decides how the three
+     * are merged.
+     */
+    public function test_recent_activity_carries_every_source_when_no_chapter_is_complete(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1, pages: 1);
+        $chapter = $subject->chapters()->first();
+
+        Sanctum::actingAs($student = $this->student());
+
+        $attempt = QuizAttempt::factory()->completed()->create([
+            'user_id' => $student->id,
+            'quiz_id' => $chapter->quiz->id,
+            'completed_at' => now()->subHour(),
+        ]);
+
+        $note = StudentNote::factory()->create([
+            'user_id' => $student->id,
+            'chapter_page_id' => $chapter->pages()->first()->id,
+            'created_at' => now()->subMinutes(10),
+        ]);
+
+        $activity = collect(
+            $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+                ->assertOk()
+                ->json('data.stats.recent_activity'),
+        );
+
+        $this->assertCount(2, $activity);
+        $this->assertSame(
+            [['note_created', $note->id], ['quiz_completed', $attempt->id]],
+            $activity->map(fn (array $row): array => [$row['type'], $row['entity_id']])->all(),
+        );
+        // The row shape the client reads is unchanged.
+        $this->assertSame(
+            ['type', 'title', 'timestamp', 'entity_id', 'score'],
+            array_keys($activity->first()),
+        );
+    }
+
+    public function test_recent_activity_is_empty_when_the_student_has_done_nothing(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1, pages: 1);
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+            ->assertOk()
+            ->assertJsonCount(0, 'data.stats.recent_activity');
+    }
+
+    public function test_recent_activity_orders_all_three_sources_newest_first_without_repeating_one(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 2, pages: 1);
+        [$first, $second] = $subject->chapters()->get()->all();
+
+        Sanctum::actingAs($student = $this->student());
+
+        $attempt = QuizAttempt::factory()->completed()->create([
+            'user_id' => $student->id,
+            'quiz_id' => $second->quiz->id,
+            'completed_at' => now()->subHours(3),
+        ]);
+
+        StudentChapterProgress::query()->create([
+            'user_id' => $student->id,
+            'chapter_id' => $first->id,
+            'completed_at' => now()->subHours(2),
+        ]);
+
+        $note = StudentNote::factory()->create([
+            'user_id' => $student->id,
+            'chapter_page_id' => $second->pages()->first()->id,
+            'created_at' => now()->subHour(),
+        ]);
+
+        $activity = collect(
+            $this->getJson($this->studyUrl."/subjects/{$subject->id}")
+                ->assertOk()
+                ->json('data.stats.recent_activity'),
+        );
+
+        $this->assertSame(
+            [
+                ['note_created', $note->id],
+                ['chapter_completed', $first->id],
+                ['quiz_completed', $attempt->id],
+            ],
+            $activity->map(fn (array $row): array => [$row['type'], $row['entity_id']])->all(),
+        );
+        $this->assertCount(3, $activity->unique(fn (array $row): string => $row['type'].$row['entity_id']));
     }
 
     public function test_the_statistics_endpoint_is_unchanged(): void
