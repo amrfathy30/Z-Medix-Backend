@@ -427,6 +427,13 @@ class SubjectAnalyticsService
      * introduced — anything the platform does not record simply does not appear,
      * rather than being inferred.
      *
+     * The three sources are merged as a base collection: each is mapped to
+     * plain arrays, and an Eloquent collection that maps to nothing at all
+     * stays an Eloquent collection, whose `merge()` reads `getKey()` off every
+     * incoming item. Dropping to the base collection first keeps the merge a
+     * plain append, so a student with no completed chapters still gets their
+     * quizzes and notes.
+     *
      * @return list<array{type: string, title: string, timestamp: string, entity_id: int, score: float|null}>
      */
     private function recentActivity(User $student, Subject $subject, int $limit = 10): array
@@ -499,6 +506,7 @@ class SubjectAnalyticsService
             ]);
 
         return $completedChapters
+            ->toBase()
             ->merge($completedQuizzes)
             ->merge($notes)
             ->sortByDesc('timestamp')
