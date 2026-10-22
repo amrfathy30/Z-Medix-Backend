@@ -2,6 +2,30 @@
 
 return [
 
+    'dashboard' => [
+        'title' => 'Dashboard',
+        'total_students' => 'Registered Students',
+        'new_students_30_days' => '+:count in the last 30 days',
+        'study_sessions' => 'Study Sessions',
+        'active_study_sessions' => ':count currently active',
+        'fellowship_questions' => 'Fellowship Questions',
+        'fellowships_count' => 'Across :count specialties & programs',
+        'pending_contact' => 'Pending Inquiries',
+        'contact_needs_review' => 'Awaiting admin response',
+        'contact_all_cleared' => 'All inquiries answered',
+        'student_growth_title' => 'Student Registration Growth',
+        'student_growth_subheading' => 'New student signups over the last 14 days',
+        'student_growth_dataset' => 'New Students',
+        'latest_inquiries_title' => 'Latest Incoming Inquiries',
+        'view_all_messages' => 'View All Messages',
+        'col_sender' => 'Sender',
+        'col_email' => 'Email',
+        'col_subject' => 'Subject',
+        'col_status' => 'Status',
+        'col_date' => 'Date',
+        'view_message' => 'View',
+    ],
+
     'access_management' => [
         'title' => 'Access Management',
         'navigation_label' => 'Permissions',

@@ -27,6 +27,7 @@ class InAppNotification extends Notification
         public ?string $titleKey = null,
         public ?string $bodyKey = null,
         public array $replace = [],
+        public ?string $type = null,
     ) {}
 
     /**
@@ -44,6 +45,7 @@ class InAppNotification extends Notification
     {
         return array_merge([
             'category' => $this->category,
+            'type' => $this->type ?? $this->category,
             'title' => $this->title,
             'body' => $this->body,
             'action_url' => $this->actionUrl,
