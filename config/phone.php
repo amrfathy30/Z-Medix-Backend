@@ -157,7 +157,9 @@ return [
     |
     | It replaces the provider check only: a real, unexpired pending OTP with
     | attempts remaining must still exist, and the attempt counter still moves.
-    | When it matches, Twilio Verify is not contacted at all.
+    | When it matches, the verification check does not contact Twilio Verify.
+    | Sending still uses default_provider; select log explicitly for SMS-free
+    | local testing.
     |
     | Mirrors auth_features.email_otp.test_code, and is scoped separately so a
     | phone test code never implies an email one.
