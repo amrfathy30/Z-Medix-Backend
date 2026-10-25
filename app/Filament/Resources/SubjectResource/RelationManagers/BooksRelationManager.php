@@ -101,7 +101,7 @@ class BooksRelationManager extends RelationManager
                                 'size' => (int) round(BookResource::pdfMaxSizeKb() / 1024),
                             ]))
                             ->columnSpanFull(),
-                        BookResource::totalPagesField(),
+                        BookResource::pdfPagesCountField(),
                     ]),
             ]);
     }

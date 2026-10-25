@@ -56,40 +56,36 @@ class BookCoverTest extends LearningTestCase
         $this->assertFalse($book->hasPdf());
     }
 
-    /**
-     * The page count is asked for PDF books only. A content book's pages are
-     * counted from its own rows, so it is never asked for a figure.
-     */
-    public function test_a_pdf_books_page_count_is_entered_from_either_form(): void
+    public function test_a_pdf_books_extracted_page_count_is_read_only_in_both_forms(): void
     {
         $subject = Subject::factory()->create();
 
-        // Entered while the book is created from the subject's Books table.
         $this->booksTable($subject)
             ->callAction(TestAction::make('create')->table(), [
                 'title' => 'Netter Atlas',
                 'type' => BookType::Pdf->value,
                 'classification' => 'Fundamentals',
-                'total_pages' => 640,
+                'pdf_pages_count' => 640,
             ])
             ->assertHasNoActionErrors();
 
         $book = Book::query()->where('title', 'Netter Atlas')->sole();
-
-        $this->assertSame(640, $book->total_pages);
+        $this->assertNull($book->pdf_pages_count);
         $this->assertSame('Fundamentals', $book->classification);
+        $book->forceFill(['pdf_pages_count' => 4])->saveQuietly();
 
         $this->editBook($book)
-            ->assertFormFieldExists('total_pages')
-            ->fillForm(['total_pages' => 321])
+            ->assertFormFieldDisabled('pdf_pages_count')
+            ->assertSchemaStateSet(['pdf_pages_count' => 4])
+            ->fillForm(['pdf_pages_count' => 321])
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $this->assertSame(321, $book->refresh()->total_pages);
+        $this->assertSame(4, $book->refresh()->pdf_pages_count);
 
-        // A content book is counted from its own page rows, so it is not asked.
         $this->editBook(Book::factory()->content()->create(['subject_id' => $subject->id]))
-            ->assertFormFieldHidden('total_pages');
+            ->assertFormFieldHidden('pdf_pages_count')
+            ->assertActionHidden('uploadPdf');
     }
 
     public function test_a_cover_can_be_uploaded_replaced_and_removed_from_the_book_form(): void
