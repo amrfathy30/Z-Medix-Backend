@@ -73,8 +73,7 @@ Route::get('books', [BookController::class, 'collection'])
 // The study flow. Every route validates that the requested content is
 // accessible to this student right now; navigation itself is the frontend's.
 Route::prefix('study')->middleware('feature:library')->name('study.')->group(function (): void {
-    // Study time tracking only. Sessions are never auto-closed, and more than
-    // one may be open at a time.
+    // One subject timer per student, resumed on repeat starts and closed on subject switches.
     Route::post('sessions', [StudySessionController::class, 'store'])->name('sessions.store');
     Route::post('sessions/{studySession}/end', [StudySessionController::class, 'end'])->name('sessions.end');
 

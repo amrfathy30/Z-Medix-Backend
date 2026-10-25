@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A stretch of study time a student opened on a subject.
  *
- * Nothing closes a session but the student: there is no inactivity timeout, no
- * auto-close, and no limit on how many may be open at once.
+ * A student has one open timer globally. Switching subjects ends the previous
+ * timer; leaving the browser does not. There is no inactivity timeout.
  */
 class StudySession extends Model
 {

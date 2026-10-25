@@ -14,8 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Study time tracking. The student opens and closes their own sessions: none is
- * closed for them, and leaving one open never blocks starting another.
+ * Study time tracking with same-subject resume and automatic subject switching.
  */
 class StudySessionController extends Controller
 {
@@ -31,7 +30,7 @@ class StudySessionController extends Controller
             return $this->studyErrorResponse($exception);
         }
 
-        return $this->successResponse(new StudySessionResource($session), 'Study session started.', 201);
+        return $this->successResponse(new StudySessionResource($session), 'Study session started.', $session->wasRecentlyCreated ? 201 : 200);
     }
 
     public function end(Request $request, StudySession $studySession): JsonResponse
