@@ -6084,7 +6084,7 @@
       "get": {
         "summary": "Get All Fellowships",
         "deprecated": false,
-        "description": "The Question Bank screen: every active Fellowship with this student's standing in it. Call it when the Question Bank opens.\n\nThe screen lists Fellowships, not questions — the student picks a bank and generates sessions from it. Inactive Fellowships are never listed. Ordered by name, not paginated.\n\n`average_score` is the module's single accuracy figure: correct confirmed answers over all confirmed answers. The frontend labels it \"Completion Rate\" here and \"Average Score\" inside a Fellowship; the name differs, the number does not. It is null until the student has confirmed an answer, so a new student is shown no score rather than a zero.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
+        "description": "The Question Bank screen: every active Fellowship with this student's standing in it. Call it when the Question Bank opens.\n\nThe screen lists Fellowships, not questions — the student picks a bank and generates sessions from it. Inactive Fellowships are never listed. Ordered by name and paginated — pass `page` to walk the list and `per_page` to size it.\n\n`average_score` is the module's single accuracy figure: correct confirmed answers over all confirmed answers. The frontend labels it \"Completion Rate\" here and \"Average Score\" inside a Fellowship; the name differs, the number does not. It is null until the student has confirmed an answer, so a new student is shown no score rather than a zero.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
         "operationId": "student.fellowships.index",
         "tags": [
           "Fellowships"
@@ -6109,11 +6109,36 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Rows per page. Defaults to 15, capped at 100. A value outside the range is clamped, not rejected.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 15
+            },
+            "example": 15
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "example": 1
           }
         ],
         "responses": {
           "200": {
-            "description": "Active Fellowships.",
+            "description": "A page of active Fellowships.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6136,17 +6161,27 @@
                       "items": {
                         "$ref": "#/components/schemas/FellowshipListItem"
                       }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    },
+                    "links": {
+                      "$ref": "#/components/schemas/PaginationLinks"
                     }
                   },
                   "required": [
                     "success",
                     "message",
-                    "data"
+                    "data",
+                    "meta",
+                    "links"
                   ],
                   "x-apidog-orders": [
                     "success",
                     "message",
-                    "data"
+                    "data",
+                    "meta",
+                    "links"
                   ]
                 },
                 "example": {
@@ -6183,7 +6218,19 @@
                       "total_questions": 960,
                       "average_score": null
                     }
-                  ]
+                  ],
+                  "meta": {
+                    "current_page": 1,
+                    "last_page": 2,
+                    "per_page": 15,
+                    "total": 18
+                  },
+                  "links": {
+                    "first": "https://api.example.com/api/student/fellowships?page=1",
+                    "last": "https://api.example.com/api/student/fellowships?page=2",
+                    "prev": null,
+                    "next": "https://api.example.com/api/student/fellowships?page=2"
+                  }
                 }
               }
             },

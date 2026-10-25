@@ -117,7 +117,10 @@ fellowship's live classification, for filling filter controls.
 
 ## `GET /api/student/fellowships`
 
-The Question Bank screen. Lists active fellowships, not questions.
+The Question Bank screen. Lists active fellowships, not questions. Paginated,
+ordered by name.
+
+**Query** — `per_page` (default 15, max 100), `page` (default 1).
 
 **Response**
 
@@ -137,12 +140,19 @@ The Question Bank screen. Lists active fellowships, not questions.
       "total_questions": 420,
       "average_score": 76.19
     }
-  ]
+  ],
+  "meta": { "current_page": 1, "last_page": 2, "per_page": 15, "total": 18 },
+  "links": { "first": "…", "last": "…", "prev": null, "next": "…" }
 }
 ```
 
-`performance_topics` is the fellowship's Performance Topic classification, for
-card display. `average_score` is `null` for a student who has answered nothing.
+A row carries the same fields as before. `performance_topics` is the
+fellowship's Performance Topic classification, for card display.
+`average_score` is `null` for a student who has answered nothing.
+
+`per_page` is clamped rather than rejected: below 1 it becomes 1, above 100 it
+becomes 100. The `links` carry the request's own query string, so paging keeps
+the `per_page` that was asked for.
 
 ---
 

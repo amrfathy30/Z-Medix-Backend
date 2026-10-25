@@ -21,38 +21,53 @@ use Illuminate\Http\Request;
  *
  * The Question Bank lists Fellowships, not questions: the student picks a bank
  * and generates sessions from it. Only active Fellowships are listed, and an
- * inactive one is not reachable by id either.
+ * inactive one is not reachable by id either. The listing is paginated.
  */
 class FellowshipController extends Controller
 {
     use ApiResponse, HandlesStudyExceptions, ResolvesFellowships;
 
+    /**
+     * The largest page the Question Bank listing will serve.
+     */
+    private const MAX_PER_PAGE = 100;
+
     public function __construct(private FellowshipAnalyticsService $analytics) {}
 
     /**
-     * Active Fellowships with this student's standing in each.
+     * Active Fellowships with this student's standing in each, paginated.
+     *
+     * `per_page` defaults to 15 and is capped at 100; `page` is 1-based. The
+     * page is taken at the database level, so the standing figures are only
+     * computed for the rows actually listed.
      */
     public function index(Request $request): JsonResponse
     {
         $student = $request->user();
+
+        $perPage = min(max((int) $request->integer('per_page', 15), 1), self::MAX_PER_PAGE);
 
         $fellowships = Fellowship::query()
             ->active()
             ->with(['media', 'performanceFilter.values'])
             ->withCount('questions')
             ->orderBy('name')
-            ->get();
+            ->orderBy('id')
+            ->paginate($perPage)
+            ->withQueryString();
 
-        $items = $fellowships->map(fn (Fellowship $fellowship): FellowshipListItemResource => new FellowshipListItemResource(
-            $fellowship,
-            [
-                'performance_topics' => $this->topicOptions($fellowship),
-                'total_questions' => (int) $fellowship->questions_count,
-                'average_score' => $this->analytics->averageScore($student, $fellowship),
-            ],
-        ));
+        $fellowships->getCollection()->transform(
+            fn (Fellowship $fellowship): FellowshipListItemResource => new FellowshipListItemResource(
+                $fellowship,
+                [
+                    'performance_topics' => $this->topicOptions($fellowship),
+                    'total_questions' => (int) $fellowship->questions_count,
+                    'average_score' => $this->analytics->averageScore($student, $fellowship),
+                ],
+            ),
+        );
 
-        return $this->successResponse($items);
+        return $this->paginatedResponse(FellowshipListItemResource::collection($fellowships));
     }
 
     /**
