@@ -7,14 +7,12 @@ use App\Exceptions\Learning\StudyFlowException;
 use App\Models\StudySession;
 use App\Models\Subject;
 use App\Models\User;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Opens and closes the clock on a student's study time.
- *
- * A session is only a measurement: it carries no progress, so starting one is
- * never required to read content and ending one never loses the student's
- * place. Several may be open at once, nothing closes one on the student's
- * behalf, and studying again later is a new session rather than a reopened one.
+ * One subject timer per student, independent of reading progress.
+ * Only an explicit end or a subject switch stops a normal session.
  */
 class StudySessionService
 {
@@ -24,36 +22,77 @@ class StudySessionService
     {
         $this->access->assertCanAccessSubject($student, $subject);
 
-        /** @var StudySession $session */
-        $session = $student->studySessions()->create([
-            'subject_id' => $subject->getKey(),
-            'started_at' => now(),
-        ]);
+        return DB::transaction(function () use ($student, $subject): StudySession {
+            User::query()->whereKey($student->getKey())->lockForUpdate()->firstOrFail();
 
-        return $session;
+            $session = $this->resolveOpenSessions($student);
+
+            if ($session?->subject_id === $subject->getKey()) {
+                return $session;
+            }
+
+            $transitionAt = now();
+
+            if ($session !== null) {
+                $this->close($session, $transitionAt);
+            }
+
+            return $student->studySessions()->create([
+                'subject_id' => $subject->getKey(),
+                'started_at' => $transitionAt,
+            ]);
+        }, attempts: 5);
     }
 
-    /**
-     * Close the session and store how long it ran, so total study time never
-     * has to be re-derived from timestamps.
-     */
     public function end(User $student, StudySession $session): StudySession
     {
         if ($session->user_id !== $student->getKey()) {
             throw StudyAccessException::notFound();
         }
 
-        if ($session->hasEnded()) {
-            throw StudyFlowException::studySessionAlreadyEnded();
+        return DB::transaction(function () use ($student, $session): StudySession {
+            User::query()->whereKey($student->getKey())->lockForUpdate()->firstOrFail();
+
+            $session = $student->studySessions()->whereKey($session->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($session->hasEnded()) {
+                throw StudyFlowException::studySessionAlreadyEnded();
+            }
+
+            $openSession = $this->resolveOpenSessions($student);
+
+            if ($openSession?->is($session)) {
+                $this->close($session, now());
+            }
+
+            return $session->refresh();
+        }, attempts: 5);
+    }
+
+    /**
+     * Keep the newest legacy timer (ID breaks timestamp ties). The elapsed
+     * time of superseded open timers cannot be attributed reliably. Preserve
+     * their rows with zero-length intervals instead of inventing end times
+     * or counting their overlapping time. Completed history is never changed.
+     */
+    private function resolveOpenSessions(User $student): ?StudySession
+    {
+        $sessions = $student->studySessions()->open()
+            ->orderByDesc('started_at')->orderByDesc('id')
+            ->lockForUpdate()->get();
+
+        foreach ($sessions->skip(1) as $duplicate) {
+            $this->close($duplicate, $duplicate->started_at);
         }
 
-        $endedAt = now();
+        return $sessions->first();
+    }
 
+    private function close(StudySession $session, CarbonInterface $endedAt): void
+    {
         $session->update([
             'ended_at' => $endedAt,
-            'duration_seconds' => max(0, (int) $endedAt->diffInSeconds($session->started_at, absolute: true)),
+            'duration_seconds' => max(0, (int) $session->started_at->diffInSeconds($endedAt, absolute: false)),
         ]);
-
-        return $session->refresh();
     }
 }
