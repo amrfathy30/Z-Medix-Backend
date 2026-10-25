@@ -42,6 +42,10 @@ class BookListItemResource extends JsonResource
             // progress to report for either kind of book. Null, never zero: a
             // zero would claim the student has read none of it.
             'progress_percentage' => null,
+            'subject' => $this->whenLoaded('subject', fn (): array => [
+                'id' => $this->subject->id,
+                'name' => $this->subject->name,
+            ]),
         ];
     }
 }
