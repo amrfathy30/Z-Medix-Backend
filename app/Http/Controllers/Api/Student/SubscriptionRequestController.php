@@ -12,6 +12,7 @@ use App\Support\Api\ApiResponse;
 use App\Support\Api\HandlesStudyExceptions;
 use App\Support\Subscription\SubscriptionContact;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * A student asking for a plan. Nothing is charged here: payment happens on
@@ -22,6 +23,15 @@ class SubscriptionRequestController extends Controller
     use ApiResponse, HandlesStudyExceptions;
 
     public function __construct(private SubscriptionService $subscriptions) {}
+
+    public function index(Request $request): JsonResponse
+    {
+        $requests = $request->user()->subscriptionRequests()
+            ->with('plan')
+            ->paginate(min(max($request->integer('per_page', 15), 1), 50));
+
+        return $this->paginatedResponse(SubscriptionRequestResource::collection($requests));
+    }
 
     /**
      * 201 for a new request; 200 when the student already had one pending and

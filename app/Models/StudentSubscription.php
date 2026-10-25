@@ -59,13 +59,14 @@ class StudentSubscription extends Model
     /**
      * The period granting access at the given moment, or null. Ignores
      * cancellation: callers that care use {@see status()} / {@see isActive()}.
-     * When admin-entered periods overlap, the one that started last wins.
+     * The one that started last wins permanently, including after it expires.
      */
     public function currentPeriod(?CarbonInterface $at = null): ?SubscriptionPeriod
     {
         return $this->periods()
             ->getQuery()
             ->reorder()
+            ->effectiveAt($at)
             ->covering($at)
             ->with('plan.featureLimits')
             ->orderByDesc('starts_at')
@@ -92,13 +93,14 @@ class StudentSubscription extends Model
     }
 
     /**
-     * The end of the latest period, which is where a renewal continues from.
+     * The end of the effective period, including after it expires.
      */
     public function latestEndsAt(): ?CarbonInterface
     {
         return $this->periods()
             ->getQuery()
             ->reorder()
+            ->effectiveAt()
             ->orderByDesc('ends_at')
             ->first()
             ?->ends_at;
@@ -107,7 +109,7 @@ class StudentSubscription extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->whereNull('cancelled_at')
-            ->whereHas('periods', fn (Builder $periods) => $periods->covering());
+            ->whereHas('periods', fn (Builder $periods) => $periods->effectiveAt()->covering());
     }
 
     public function scopeCancelled(Builder $query): Builder
@@ -118,6 +120,7 @@ class StudentSubscription extends Model
     public function scopeExpired(Builder $query): Builder
     {
         return $query->whereNull('cancelled_at')
-            ->whereDoesntHave('periods', fn (Builder $periods) => $periods->covering());
+            ->whereHas('periods')
+            ->whereDoesntHave('periods', fn (Builder $periods) => $periods->effectiveAt()->covering());
     }
 }

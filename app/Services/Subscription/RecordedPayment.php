@@ -20,7 +20,6 @@ final class RecordedPayment
      * @param  UploadedFile|string  $proof  The payment screenshot: an upload, or an absolute path to a file the
      *                                      media library may take over.
      * @param  string|null  $currency  Defaults to the plan's currency.
-     * @param  CarbonInterface|null  $startsAt  Defaults to where the student's current coverage ends, or now.
      */
     public function __construct(
         public readonly User $student,
@@ -29,7 +28,6 @@ final class RecordedPayment
         public readonly string|float $amount,
         public readonly UploadedFile|string $proof,
         public readonly ?CarbonInterface $paidAt = null,
-        public readonly ?CarbonInterface $startsAt = null,
         public readonly ?string $currency = null,
         public readonly ?string $notes = null,
         public readonly ?Admin $recordedBy = null,

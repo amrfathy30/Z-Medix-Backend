@@ -15,7 +15,6 @@ use App\Models\SubscriptionPeriod;
 use App\Models\SubscriptionRequest;
 use App\Models\User;
 use App\Services\Media\MediaUploadService;
-use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -51,20 +50,21 @@ class SubscriptionService
             $this->promos->validatePlan($plan, $cycle);
             $code = filled($promoCode) ? PromoCode::normalize($promoCode) : null;
 
-            if ($pending !== null && $pending->plan_id === $plan->getKey()
+            if ($code === null && $pending !== null && $pending->plan_id === $plan->getKey()
                 && $pending->billing_cycle === $cycle && $pending->pricing_snapshot !== null
                 && ($pending->pricing_snapshot['code'] ?? null) === $code) {
                 return $pending;
-            }
-
-            if ($pending !== null) {
-                $this->transitionPromoUsage($pending, 'released');
             }
 
             $pricing = $code === null
                 ? ['code' => null] + $this->promos->pricing($plan, $cycle)
                 : $this->promos->validate($student, $plan, $cycle, $code, lock: true);
             unset($pricing['valid']);
+
+            if ($pending !== null) {
+                $this->transitionPromoUsage($pending, 'released');
+            }
+
             $attributes = [
                 'user_id' => $student->getKey(),
                 'plan_id' => $plan->getKey(),
@@ -105,10 +105,9 @@ class SubscriptionService
      * Turns a payment the admin took into a period, creating the student's
      * subscription the first time and extending it afterwards.
      *
-     * A renewal continues from where the student's coverage ends (or from now if
-     * it has lapsed); the admin can override the start, for example to start an
-     * upgrade immediately. Overlapping periods are allowed: the one that started
-     * last decides the plan.
+     * Every payment starts a period immediately at the server approval time.
+     * The latest period decides the plan permanently; older periods remain
+     * unchanged as history and never resume granting access.
      *
      * @throws SubscriptionException
      */
@@ -122,7 +121,7 @@ class SubscriptionService
             }
         }
 
-        return DB::transaction(function () use ($payment, $request): SubscriptionPeriod {
+        $period = DB::transaction(function () use ($payment, $request): SubscriptionPeriod {
             User::query()->lockForUpdate()->findOrFail($payment->student->getKey());
             if ($request !== null) {
                 // Re-read under a lock so two admins approving the same request
@@ -141,8 +140,8 @@ class SubscriptionService
                 ->first()
                 ?? StudentSubscription::query()->create(['user_id' => $payment->student->getKey()]);
 
-            $startsAt = $payment->startsAt ?? $this->defaultStart($subscription);
-            $paidAt = $payment->paidAt ?? now();
+            $startsAt = now();
+            $paidAt = $payment->paidAt ?? $startsAt;
 
             /** @var SubscriptionPeriod $period */
             $period = $subscription->periods()->create([
@@ -169,7 +168,7 @@ class SubscriptionService
                 $request->forceFill([
                     'status' => SubscriptionRequestStatus::Approved,
                     'handled_by' => $payment->recordedBy?->getKey(),
-                    'handled_at' => now(),
+                    'handled_at' => $startsAt,
                 ])->save();
                 $this->transitionPromoUsage($request, 'consumed');
             }
@@ -237,16 +236,5 @@ class SubscriptionService
         ])->save();
 
         return $subscription;
-    }
-
-    /**
-     * Where a new period begins when the admin does not say: straight after the
-     * coverage the student already has, or now if there is none left.
-     */
-    private function defaultStart(StudentSubscription $subscription): CarbonInterface
-    {
-        $latestEnd = $subscription->latestEndsAt();
-
-        return $latestEnd !== null && $latestEnd->isFuture() ? $latestEnd : now();
     }
 }

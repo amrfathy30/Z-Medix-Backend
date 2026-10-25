@@ -651,7 +651,6 @@ return [
         'field_paid_at' => 'Paid At',
         'field_starts_at' => 'Starts At',
         'field_starts_at_short' => 'Starts',
-        'starts_at_hint' => 'Leave empty to start when the current coverage ends (or now, if there is none). Set it to start an upgrade immediately.',
         'field_ends_at' => 'Ends',
         'field_notes' => 'Notes',
         'field_proof' => 'Payment Screenshot',

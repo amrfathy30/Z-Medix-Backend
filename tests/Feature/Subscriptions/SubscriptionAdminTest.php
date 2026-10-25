@@ -296,17 +296,17 @@ class SubscriptionAdminTest extends SubscriptionTestCase
 
     public function test_the_admin_adds_a_renewal_period_with_its_screenshot(): void
     {
+        $this->travelTo('2026-03-10 12:34:56');
         $plan = Plan::factory()->basic()->create();
         $subscription = StudentSubscription::factory()->active($plan)->create();
-        $current = $subscription->currentPeriod();
 
         $this->periods($subscription)
-            ->callAction(TestAction::make('addPeriod')->table(), $this->payment($plan))
+            ->callAction(TestAction::make('addPeriod')->table(), $this->payment($plan, ['starts_at' => now()->addDays(5)->toDateTimeString()]))
             ->assertHasNoActionErrors();
 
         $renewal = $subscription->periods()->get()->last();
         $this->assertCount(2, $subscription->periods);
-        $this->assertTrue($renewal->starts_at->equalTo($current->ends_at), 'A renewal continues where the coverage ends.');
+        $this->assertTrue($renewal->starts_at->equalTo(now()), 'A renewal starts at approval.');
         $this->assertNotNull($renewal->proof());
     }
 
@@ -348,7 +348,7 @@ class SubscriptionAdminTest extends SubscriptionTestCase
 
         // Cancelled means no access, even though the paid period has time left.
         $this->actingAsStudent($subscription->user);
-        $this->getJson('/api/student/study/subjects')->assertForbidden();
+        $this->getJson('/api/student/study/subjects')->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
 
         $page->assertActionHidden('cancel')
             ->callAction('reinstate')

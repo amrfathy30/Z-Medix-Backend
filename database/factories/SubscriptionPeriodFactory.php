@@ -65,15 +65,6 @@ class SubscriptionPeriodFactory extends Factory
         ]);
     }
 
-    /** Starts in the future (a renewal paid ahead of time). */
-    public function upcoming(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'starts_at' => now()->addDays(5),
-            'ends_at' => now()->addDays(5)->addMonthNoOverflow(),
-        ]);
-    }
-
     public function yearly(): static
     {
         return $this->state(function (array $attributes) {

@@ -58,7 +58,7 @@ class ProfileSubscriptionTest extends SubscriptionTestCase
             StudentSubscription::factory()->for($student, 'user')->cancelled()->active($plan)->create();
         } elseif ($state === 'future') {
             $subscription = StudentSubscription::factory()->for($student, 'user')->create();
-            SubscriptionPeriod::factory()->upcoming()->for($subscription, 'subscription')->for($plan)->create();
+            SubscriptionPeriod::factory()->for($subscription, 'subscription')->for($plan)->create(['starts_at' => now()->addDay(), 'ends_at' => now()->addMonth()]);
         } elseif ($state === 'pending') {
             SubscriptionRequest::factory()->for($student, 'user')->for($plan)->create();
         }

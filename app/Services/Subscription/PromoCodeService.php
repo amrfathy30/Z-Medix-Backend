@@ -7,6 +7,7 @@ use App\Exceptions\Subscription\SubscriptionException;
 use App\Models\Plan;
 use App\Models\PromoCode;
 use App\Models\User;
+use Illuminate\Support\Facades\Validator;
 
 class PromoCodeService
 {
@@ -22,6 +23,11 @@ class PromoCodeService
         }
         if (! $promo->is_active) {
             throw SubscriptionException::promo('PROMO_CODE_INACTIVE');
+        }
+        if (Validator::make(['discount_percentage' => $promo->getRawOriginal('discount_percentage')], [
+            'discount_percentage' => ['required', 'numeric', 'between:0,100', 'decimal:0,2'],
+        ])->fails()) {
+            throw SubscriptionException::promo('PROMO_CODE_INVALID');
         }
         $now = now();
         if ($now->lt($promo->valid_from)) {

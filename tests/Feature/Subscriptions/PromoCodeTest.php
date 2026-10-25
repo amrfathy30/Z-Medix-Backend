@@ -56,7 +56,7 @@ class PromoCodeTest extends SubscriptionTestCase
         $this->assertDatabaseCount('subscription_requests', 0);
     }
 
-    public function test_submission_saves_server_prices_and_retries_preserve_the_snapshot(): void
+    public function test_submission_saves_server_prices_and_invalid_resubmissions_preserve_the_snapshot(): void
     {
         $promo = PromoCode::factory()->create();
         $plan = Plan::factory()->create(['monthly_price' => '10.05']);
@@ -67,7 +67,7 @@ class PromoCodeTest extends SubscriptionTestCase
         $promo->update(['discount_percentage' => 80, 'is_active' => false]);
         $plan->update(['monthly_price' => 500]);
         $promo->delete();
-        $this->postJson(self::REQUESTS, $payload)->assertOk()->assertJsonPath('data.request.pricing', $snapshot);
+        $this->postJson(self::REQUESTS, $payload)->assertUnprocessable()->assertJsonPath('code', 'PROMO_CODE_INVALID');
         $this->getJson('/api/student/subscription')->assertJsonPath('data.pending_request.pricing', $snapshot);
         $usage = PromoCodeUsage::query()->sole();
         $this->assertSame('10.05', $usage->original_price);
@@ -210,14 +210,16 @@ class PromoCodeTest extends SubscriptionTestCase
         $promo = PromoCode::factory()->create();
         $request = $this->submit($promo);
         $original = $request->promoCodeUsages()->sole();
+        $replacementPromo = PromoCode::factory()->create();
         $plan = Plan::factory()->create(['monthly_price' => 300]);
         $service = app(SubscriptionService::class);
-        $updated = $service->submitRequest($request->user, $plan, BillingCycle::Monthly, $promo->code);
+        $updated = $service->submitRequest($request->user, $plan, BillingCycle::Monthly, $replacementPromo->code);
         $this->assertSame($request->id, $updated->id);
         $this->assertSame(PromoCodeUsageStatus::Released, $original->fresh()->status);
         $this->assertSame('300.00', $updated->promoCodeUsages()->latest('id')->first()->original_price);
         $service->submitRequest($request->user, $plan, BillingCycle::Monthly);
         $this->assertSame(0, $promo->usages()->where('status', 'reserved')->count());
+        $this->assertSame(0, $replacementPromo->usages()->where('status', 'reserved')->count());
         $this->assertNull($request->fresh()->pricing_snapshot['code']);
         $this->assertDatabaseCount('subscription_requests', 1);
     }
