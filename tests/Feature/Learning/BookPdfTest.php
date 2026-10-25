@@ -69,8 +69,25 @@ class BookPdfTest extends LearningTestCase
         $book = Book::query()->where('title', 'Netter Atlas')->sole();
 
         $this->assertTrue($book->hasPdf());
+        $this->assertSame(1, $book->pdf_pages_count);
         $this->assertSame(1, $book->getMedia(Book::PDF_COLLECTION)->count());
         $this->assertSame(ContentStatus::Draft, $book->status);
+    }
+
+    public function test_a_corrupt_pdf_is_rejected_during_book_creation(): void
+    {
+        $subject = Subject::factory()->create();
+
+        $this->booksTable($subject)
+            ->callAction(TestAction::make('create')->table(), [
+                'title' => 'Corrupt PDF',
+                'type' => BookType::Pdf->value,
+                'book_pdf' => UploadedFile::fake()->createWithContent('corrupt.pdf', '%PDF-1.4 broken'),
+            ])
+            ->assertHasActionErrors(['book_pdf']);
+
+        $this->assertDatabaseCount('media', 0);
+        $this->assertFalse(Book::query()->whereNotNull('pdf_pages_count')->exists());
     }
 
     public function test_the_pdf_lives_in_the_book_pdf_collection(): void
@@ -120,6 +137,23 @@ class BookPdfTest extends LearningTestCase
 
         $this->assertSame(1, $book->getMedia(Book::PDF_COLLECTION)->count());
         $this->assertSame('new.pdf', $book->pdfFileName());
+        $this->assertSame(1, $book->pdf_pages_count);
+    }
+
+    public function test_a_failed_pdf_replacement_from_the_book_view_preserves_the_previous_pdf(): void
+    {
+        $book = Book::factory()->withPdfFile('original.pdf')->create();
+        $original = $book->getFirstMedia(Book::PDF_COLLECTION);
+
+        $this->bookView($book)
+            ->callAction($this->uploadPdfAction(), [
+                'pdf' => UploadedFile::fake()->createWithContent('corrupt.pdf', '%PDF-1.4 broken'),
+            ])
+            ->assertHasActionErrors(['pdf']);
+
+        $this->assertSame(1, $book->refresh()->pdf_pages_count);
+        $this->assertSame($original->id, $book->getFirstMedia(Book::PDF_COLLECTION)->id);
+        $this->assertFileExists($original->getPath());
     }
 
     public function test_the_pdf_is_served_through_the_media_url_helper(): void

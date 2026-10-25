@@ -80,7 +80,8 @@ class SubjectTabsTest extends StudyTestCase
 
         $pdf = Book::factory()->pdf()->create([
             'subject_id' => $subject->id,
-            'total_pages' => 240,
+            'total_pages' => 999,
+            'pdf_pages_count' => 240,
         ]);
         $pdf->addMedia(UploadedFile::fake()->image('cover.jpg'))
             ->toMediaCollection(Book::COVER_COLLECTION);
@@ -97,7 +98,7 @@ class SubjectTabsTest extends StudyTestCase
             // Nothing records how far through a book a student has read, so no
             // progress is reported for either kind of book.
             ->assertJsonPath('data.books.0.progress_percentage', null)
-            // A PDF book reports the figure the admin typed.
+            // A PDF book reports its stored extracted count.
             ->assertJsonPath('data.books.1.pages_count', 240);
 
         $this->assertNotNull($response->json('data.books.1.cover_image'));

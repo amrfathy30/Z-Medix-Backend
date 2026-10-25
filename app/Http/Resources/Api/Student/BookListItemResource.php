@@ -33,8 +33,7 @@ class BookListItemResource extends JsonResource
             'type' => $this->type?->value,
             'order' => $this->order,
             'has_pdf' => $this->isPdf() && $this->hasPdf(),
-            // Counted from the page rows of a content book, the admin's own
-            // figure for a PDF one, and null when a PDF book has none.
+            // Content page rows or the stored PDF count; unknown PDF counts are null.
             'pages_count' => $this->totalPages(),
             'cover_image' => $this->coverUrl(),
             // Nothing records which page of a book a student has read — page

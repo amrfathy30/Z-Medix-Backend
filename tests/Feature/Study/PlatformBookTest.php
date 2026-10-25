@@ -75,8 +75,8 @@ class PlatformBookTest extends StudyTestCase
             ->assertJsonPath('data.0.has_pdf', false)
             ->assertJsonPath('data.1.type', 'pdf')
             ->assertJsonPath('data.1.has_pdf', true)
-            // A PDF book keeps its material in its file, not in page rows.
-            ->assertJsonPath('data.1.pages_count', null);
+            // The uploaded PDF has one page, independent of content page rows.
+            ->assertJsonPath('data.1.pages_count', 1);
     }
 
     public function test_a_pdf_book_hands_over_its_file(): void
@@ -91,7 +91,7 @@ class PlatformBookTest extends StudyTestCase
             ->assertJsonPath('data.type', 'pdf')
             ->assertJsonPath('data.has_pdf', true)
             ->assertJsonPath('data.pdf_file_name', 'anatomy.pdf')
-            ->assertJsonPath('data.pages_count', null)
+            ->assertJsonPath('data.pages_count', 1)
             ->assertJsonPath('data.pages', []);
 
         $this->assertNotNull(
@@ -285,7 +285,7 @@ class PlatformBookTest extends StudyTestCase
         $this->getJson($this->studyUrl."/book-pages/{$page->id}")
             ->assertNotFound()->assertJsonPath('code', 'BOOK_CONTENT_UNAVAILABLE');
         $this->getJson($this->studyUrl."/books/{$book->id}")
-            ->assertOk()->assertJsonPath('data.pages', [])->assertJsonPath('data.pages_count', 240);
+            ->assertOk()->assertJsonPath('data.pages', [])->assertJsonPath('data.pages_count', null);
     }
 
     public function test_an_unpublished_book_cannot_be_opened(): void

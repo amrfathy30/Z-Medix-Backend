@@ -14,8 +14,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * index without bodies. Each body is read through the individual page endpoint.
  *
  * `pages_count` is the book's length whichever kind it is — counted from the
- * page rows of a content book, the admin's own figure for a PDF one, and null
- * when a PDF book has none, since nothing here parses the file.
+ * page rows of a content book, the stored extracted count for a PDF one, and
+ * null when its PDF count is unknown. No files are parsed during API requests.
  *
  * The PDF URL is the platform book's existing public media URL — unchanged by
  * the student API. A student's own uploads are a different thing entirely and

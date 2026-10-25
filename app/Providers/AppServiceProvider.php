@@ -59,15 +59,19 @@ use App\Policies\SubjectPolicy;
 use App\Policies\SubscriptionPeriodPolicy;
 use App\Policies\SubscriptionRequestPolicy;
 use App\Services\Fellowship\ExcelSpreadsheetReader;
+use App\Services\Learning\BookPdfPageCountService;
 use App\Services\Phone\Providers\LogPhoneVerificationProvider;
 use App\Services\Phone\Providers\TwilioVerifyProvider;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Spatie\MediaLibrary\MediaCollections\Events\MediaHasBeenAddedEvent;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -108,6 +112,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(MediaHasBeenAddedEvent::class, [BookPdfPageCountService::class, 'added']);
+        Media::deleted(fn (Media $media) => app(BookPdfPageCountService::class)->deleted($media));
+
         VerifyEmail::createUrlUsing(function (object $notifiable): string {
             return URL::temporarySignedRoute(
                 'public.auth.verify-email',
