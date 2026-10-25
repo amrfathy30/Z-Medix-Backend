@@ -462,7 +462,7 @@ class PhoneNumberService
             return false;
         }
 
-        if (in_array('production', $environments, strict: true)) {
+        if (app()->isProduction() || in_array('production', $environments, strict: true)) {
             return false;
         }
 
