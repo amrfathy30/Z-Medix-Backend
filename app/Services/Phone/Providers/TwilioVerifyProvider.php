@@ -92,15 +92,14 @@ class TwilioVerifyProvider implements PhoneVerificationProviderInterface
 
     /**
      * Twilio's own wording can name the account, the Verify service or the
-     * recipient, so it is written to the log and replaced by a generic message
-     * before it can reach an API client.
+     * recipient, so only the operation and numeric error code are logged.
+     * API clients receive a generic message.
      */
     private function maskProviderFailure(string $operation, TwilioException $e): VerificationException
     {
         Log::warning('Twilio Verify request failed.', [
             'operation' => $operation,
             'code' => $e->getCode(),
-            'message' => $e->getMessage(),
         ]);
 
         return VerificationException::deliveryFailed();

@@ -117,6 +117,24 @@ class PhoneNumberService
         }
     }
 
+    public function validateReplacement(PhoneNumber $phoneNumber, string $phone, string $country): string
+    {
+        [$e164] = $this->parseAndValidate(
+            $phone,
+            $country,
+            config('auth_features.registration.allowed_phone_countries', []),
+        );
+
+        if ($e164 === $phoneNumber->e164_number && $phoneNumber->status === PhoneStatus::Verified) {
+            throw VerificationException::alreadyVerified();
+        }
+
+        $this->enforceUniquenessForOwner($phoneNumber->owner, $e164, $phoneNumber->id);
+        $this->enforceGlobalUniqueness($e164, $phoneNumber->id);
+
+        return $e164;
+    }
+
     /**
      * Soft-delete a phone number. If it was primary, promote another phone.
      */
@@ -183,6 +201,8 @@ class PhoneNumberService
         ?string $channel = null,
         array $metadata = [],
     ): PhoneVerificationOtp {
+        $this->ensureOtpEnabled();
+
         $purposeEnum = OtpPurpose::from($purpose);
         $ipAddress = $metadata['ip_address'] ?? null;
 
@@ -213,6 +233,8 @@ class PhoneNumberService
         ?string $channel = null,
         array $metadata = [],
     ): PhoneVerificationOtp {
+        $this->ensureOtpEnabled();
+
         $channel ??= config('phone.default_channel', 'sms');
 
         $supported = config('phone.supported_channels', ['sms']);
@@ -261,7 +283,10 @@ class PhoneNumberService
         string $code,
         string $purpose = 'phone_verification',
         array $metadata = [],
+        bool $markPhoneVerified = true,
     ): bool {
+        $this->ensureOtpEnabled();
+
         $purposeEnum = OtpPurpose::from($purpose);
 
         $otp = $phoneNumber->otps()
@@ -312,16 +337,18 @@ class PhoneNumberService
             );
 
         if ($result['valid']) {
-            DB::transaction(function () use ($otp, $phoneNumber) {
+            DB::transaction(function () use ($otp, $phoneNumber, $markPhoneVerified) {
                 $otp->update([
                     'status' => OtpStatus::Verified,
                     'verified_at' => now(),
                 ]);
 
-                $phoneNumber->update([
-                    'status' => PhoneStatus::Verified,
-                    'verified_at' => now(),
-                ]);
+                if ($markPhoneVerified) {
+                    $phoneNumber->update([
+                        'status' => PhoneStatus::Verified,
+                        'verified_at' => now(),
+                    ]);
+                }
             });
 
             return true;
@@ -493,6 +520,13 @@ class PhoneNumberService
     private function throttleScope(string $e164, OtpPurpose $purpose, ?string $ipAddress): string
     {
         return sha1($e164.'|'.$purpose->value.'|'.($ipAddress ?? 'unknown'));
+    }
+
+    public function ensureOtpEnabled(): void
+    {
+        if (! config('phone.otp_enabled', true)) {
+            throw VerificationException::disabled();
+        }
     }
 
     private function maxAttempts(): int
