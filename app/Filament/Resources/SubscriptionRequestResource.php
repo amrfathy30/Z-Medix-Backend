@@ -5,14 +5,19 @@ namespace App\Filament\Resources;
 use App\Enums\SubscriptionRequestStatus;
 use App\Exceptions\Subscription\SubscriptionException;
 use App\Filament\Resources\SubscriptionRequestResource\Pages\ListSubscriptionRequests;
+use App\Filament\Resources\SubscriptionRequestResource\Pages\ViewSubscriptionRequest;
 use App\Models\SubscriptionRequest;
 use App\Services\Subscription\SubscriptionService;
 use App\Support\Filament\SubscriptionPeriodForm;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Textarea;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -104,6 +109,8 @@ class SubscriptionRequestResource extends Resource
                         SubscriptionRequestStatus::Approved => 'success',
                         SubscriptionRequestStatus::Rejected => 'danger',
                     }),
+                TextColumn::make('pricing_snapshot.code')->label(__('promo_codes.singular'))->placeholder('—'),
+                TextColumn::make('pricing_snapshot.final_price')->label(__('promo_codes.final_price'))->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->label(__('admin.subscription_requests.field_requested_at'))
                     ->dateTime()
@@ -129,6 +136,7 @@ class SubscriptionRequestResource extends Resource
                     ->default(SubscriptionRequestStatus::Pending->value),
             ])
             ->recordActions([
+                ViewAction::make(),
                 self::approveAction(),
                 self::rejectAction(),
             ])
@@ -152,7 +160,13 @@ class SubscriptionRequestResource extends Resource
                 'student' => $record->user?->name,
             ]))
             ->modalSubmitActionLabel(__('admin.subscription_requests.action_approve'))
-            ->fillForm(fn (SubscriptionRequest $record): array => SubscriptionPeriodForm::defaults($record->plan, $record->billing_cycle))
+            ->fillForm(fn (SubscriptionRequest $record): array => array_replace(
+                SubscriptionPeriodForm::defaults($record->plan, $record->billing_cycle),
+                $record->pricing_snapshot === null ? [] : [
+                    'amount' => number_format($record->pricing_snapshot['final_price'], 2, '.', ''),
+                    'currency' => $record->pricing_snapshot['currency'],
+                ],
+            ))
             ->schema(SubscriptionPeriodForm::schema())
             ->action(function (array $data, SubscriptionRequest $record): void {
                 try {
@@ -201,10 +215,30 @@ class SubscriptionRequestResource extends Resource
             });
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->components([
+            Section::make(__('admin.subscription_requests.model_label'))->columns(2)->columnSpanFull()->schema([
+                TextEntry::make('user.name')->label(__('admin.subscriptions.field_student')),
+                TextEntry::make('plan.name')->label(__('admin.subscriptions.field_plan')),
+                TextEntry::make('billing_cycle')->label(__('admin.subscriptions.field_billing_cycle')),
+                TextEntry::make('status')->label(__('admin.subscriptions.field_status'))->badge(),
+                TextEntry::make('admin_note')->label(__('admin.subscription_requests.field_admin_note'))->placeholder('—'),
+                TextEntry::make('created_at')->label(__('admin.subscription_requests.field_requested_at'))->dateTime(),
+            ]),
+            Section::make(__('promo_codes.pricing'))->columns(3)->columnSpanFull()->schema(
+                collect(['code', 'discount_percentage', 'original_price', 'discount_amount', 'final_price', 'currency'])
+                    ->map(fn (string $field): TextEntry => TextEntry::make('pricing_snapshot.'.$field)->label(__('promo_codes.'.$field))->placeholder('—'))
+                    ->all(),
+            ),
+        ]);
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListSubscriptionRequests::route('/'),
+            'view' => ViewSubscriptionRequest::route('/{record}'),
         ];
     }
 }

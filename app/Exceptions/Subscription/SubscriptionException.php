@@ -51,6 +51,11 @@ class SubscriptionException extends StudyException
         );
     }
 
+    public static function promo(string $code): self
+    {
+        return new self(__('promo_codes.errors.'.$code), $code, Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
     public static function requestNotPending(): self
     {
         return new self(

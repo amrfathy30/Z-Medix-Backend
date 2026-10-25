@@ -33,7 +33,7 @@ class SubscriptionRequestController extends Controller
         $cycle = $request->cycle();
 
         try {
-            $subscriptionRequest = $this->subscriptions->submitRequest($request->user(), $plan, $cycle);
+            $subscriptionRequest = $this->subscriptions->submitRequest($request->user(), $plan, $cycle, $request->validated('promo_code'));
         } catch (SubscriptionException $exception) {
             return $this->studyErrorResponse($exception);
         }

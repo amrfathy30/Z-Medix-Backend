@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api\Student;
 
 use App\Enums\BillingCycle;
 use App\Models\Plan;
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -19,7 +20,7 @@ class StoreSubscriptionRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user() instanceof User;
     }
 
     /** @return array<string, ValidationRule|array<mixed>|string> */
@@ -28,6 +29,7 @@ class StoreSubscriptionRequestRequest extends FormRequest
         return [
             'plan_id' => ['required', 'integer', Rule::exists('plans', 'id')->whereNull('deleted_at')],
             'billing_cycle' => ['required', Rule::enum(BillingCycle::class)],
+            'promo_code' => ['nullable', 'string', 'max:64'],
         ];
     }
 
