@@ -2,12 +2,9 @@
 
 namespace App\Http\Requests\Api\Student;
 
-use App\Enums\FellowshipQuestionStatusFilter;
-use App\Enums\QuizDifficulty;
-use App\Support\Fellowship\SessionGenerationCriteria;
+use App\Support\Fellowship\ValidatesQuestionPoolCriteria;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Generating a session. The Fellowship comes from the route, never from the
@@ -20,9 +17,16 @@ use Illuminate\Validation\Rule;
  * `filters` is keyed by filter id, each holding the value ids chosen within it.
  * Only values belonging to this Fellowship are accepted, which is validation's
  * part of keeping a question answerable to its own Fellowship's classifications.
+ *
+ * The narrowings themselves are shared with
+ * {@see CountFellowshipQuestionsRequest} through
+ * {@see ValidatesQuestionPoolCriteria}, so the pool the form is told about and
+ * the pool this draws from are described by one set of rules.
  */
 class GenerateFellowshipSessionRequest extends FormRequest
 {
+    use ValidatesQuestionPoolCriteria;
+
     public function authorize(): bool
     {
         return true;
@@ -31,8 +35,6 @@ class GenerateFellowshipSessionRequest extends FormRequest
     /** @return array<string, ValidationRule|array<mixed>|string> */
     public function rules(): array
     {
-        $fellowshipId = $this->route('fellowship')?->getKey();
-
         return [
             'title' => ['required', 'string', 'max:255'],
             'question_count' => [
@@ -41,29 +43,8 @@ class GenerateFellowshipSessionRequest extends FormRequest
                 'min:'.(int) config('fellowship.session.min_question_count', 1),
                 'max:'.(int) config('fellowship.session.max_question_count', 200),
             ],
-            'timer_enabled' => ['sometimes', 'boolean'],
 
-            'difficulties' => ['sometimes', 'array'],
-            'difficulties.*' => ['string', Rule::enum(QuizDifficulty::class)],
-
-            'question_status' => ['sometimes', Rule::enum(FellowshipQuestionStatusFilter::class)],
-
-            'filters' => ['sometimes', 'array'],
-            'filters.*' => ['array'],
-            'filters.*.*' => [
-                'integer',
-                // Scoped to this Fellowship's own filters: a value id from
-                // another Fellowship is rejected here rather than silently
-                // matching nothing.
-                Rule::exists('fellowship_filter_values', 'id')->where(
-                    fn ($query) => $query->whereIn(
-                        'fellowship_filter_id',
-                        fn ($filters) => $filters->select('id')
-                            ->from('fellowship_filters')
-                            ->where('fellowship_id', $fellowshipId),
-                    ),
-                ),
-            ],
+            ...$this->questionPoolRules(),
         ];
     }
 
@@ -72,9 +53,7 @@ class GenerateFellowshipSessionRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'filters.*.*.exists' => 'One of the selected filter values does not belong to this fellowship.',
-        ];
+        return $this->questionPoolMessages();
     }
 
     public function title(): string
@@ -85,19 +64,5 @@ class GenerateFellowshipSessionRequest extends FormRequest
     public function questionCount(): int
     {
         return $this->integer('question_count');
-    }
-
-    public function criteria(): SessionGenerationCriteria
-    {
-        /** @var array<int|string, array<int|string>> $filters */
-        $filters = $this->input('filters', []);
-
-        return SessionGenerationCriteria::make(
-            filterValueIds: is_array($filters) ? $filters : [],
-            difficulties: (array) $this->input('difficulties', []),
-            questionStatus: FellowshipQuestionStatusFilter::tryFrom((string) $this->input('question_status', ''))
-                ?? FellowshipQuestionStatusFilter::All,
-            timerEnabled: $this->boolean('timer_enabled'),
-        );
     }
 }

@@ -6084,7 +6084,7 @@
       "get": {
         "summary": "Get All Fellowships",
         "deprecated": false,
-        "description": "The Question Bank screen: every active Fellowship with this student's standing in it. Call it when the Question Bank opens.\n\nThe screen lists Fellowships, not questions — the student picks a bank and generates sessions from it. Inactive Fellowships are never listed. Ordered by name, not paginated.\n\n`average_score` is the module's single accuracy figure: correct confirmed answers over all confirmed answers. The frontend labels it \"Completion Rate\" here and \"Average Score\" inside a Fellowship; the name differs, the number does not. It is null until the student has confirmed an answer, so a new student is shown no score rather than a zero.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
+        "description": "The Question Bank screen: every active Fellowship with this student's standing in it. Call it when the Question Bank opens.\n\nThe screen lists Fellowships, not questions — the student picks a bank and generates sessions from it. Inactive Fellowships are never listed. Ordered by name and paginated — pass `page` to walk the list and `per_page` to size it.\n\n`average_score` is the module's single accuracy figure: correct confirmed answers over all confirmed answers. The frontend labels it \"Completion Rate\" here and \"Average Score\" inside a Fellowship; the name differs, the number does not. It is null until the student has confirmed an answer, so a new student is shown no score rather than a zero.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
         "operationId": "student.fellowships.index",
         "tags": [
           "Fellowships"
@@ -6109,11 +6109,36 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Rows per page. Defaults to 15, capped at 100. A value outside the range is clamped, not rejected.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 15
+            },
+            "example": 15
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "example": 1
           }
         ],
         "responses": {
           "200": {
-            "description": "Active Fellowships.",
+            "description": "A page of active Fellowships.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6136,17 +6161,27 @@
                       "items": {
                         "$ref": "#/components/schemas/FellowshipListItem"
                       }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    },
+                    "links": {
+                      "$ref": "#/components/schemas/PaginationLinks"
                     }
                   },
                   "required": [
                     "success",
                     "message",
-                    "data"
+                    "data",
+                    "meta",
+                    "links"
                   ],
                   "x-apidog-orders": [
                     "success",
                     "message",
-                    "data"
+                    "data",
+                    "meta",
+                    "links"
                   ]
                 },
                 "example": {
@@ -6183,7 +6218,19 @@
                       "total_questions": 960,
                       "average_score": null
                     }
-                  ]
+                  ],
+                  "meta": {
+                    "current_page": 1,
+                    "last_page": 2,
+                    "per_page": 15,
+                    "total": 18
+                  },
+                  "links": {
+                    "first": "https://api.example.com/api/student/fellowships?page=1",
+                    "last": "https://api.example.com/api/student/fellowships?page=2",
+                    "prev": null,
+                    "next": "https://api.example.com/api/student/fellowships?page=2"
+                  }
                 }
               }
             },
@@ -6444,7 +6491,7 @@
       "get": {
         "summary": "Get Fellowship Filters",
         "deprecated": false,
-        "description": "Everything the Generate Session form needs to offer: this Fellowship's own dynamic filters and their values, the difficulty levels, the question statuses, the size of the bank, the per-question time limit a timed session would snapshot, and the maximum question count. Call it when the Generate Session form opens.\n\nThe filters are per-Fellowship, so another Fellowship's classifications never appear here. `is_performance` marks the Fellowship's required Performance Topic classification — it is offered for narrowing like any other filter and flagged so the frontend can give it the prominence it has elsewhere.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
+        "description": "Everything the Generate Session form needs to offer: this Fellowship's own dynamic filters and their values, the difficulty levels, the question statuses, the size of the bank, the per-question time limit a timed session would snapshot, and the maximum question count. Call it when the Generate Session form opens.\n\nThe filters are per-Fellowship, so another Fellowship's classifications never appear here. `is_performance` marks the Fellowship's required Performance Topic classification — exactly one filter carries it, every question in the bank holds one of its values, and Topic Performance analytics are reported by those values. It is offered for narrowing like any other filter and flagged so the frontend can give it the prominence it has elsewhere. A Fellowship whose classification has not been designated yet has no filter with this flag.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
         "operationId": "student.fellowships.filters",
         "tags": [
           "Fellowships · Filters & Availability"
@@ -6534,7 +6581,7 @@
                         },
                         "total_questions": {
                           "type": "integer",
-                          "description": "Questions currently available in this Fellowship's bank."
+                          "description": "Questions currently available in this Fellowship's whole bank, before any filtering. Not the same as Count Available Questions' `available_questions`, which is the filtered, per-student eligible count."
                         },
                         "question_time_limit_seconds": {
                           "type": "integer",
@@ -6542,7 +6589,7 @@
                         },
                         "max_question_count": {
                           "type": "integer",
-                          "description": "The ceiling `question_count` is validated against."
+                          "description": "The configurable system ceiling `question_count` is validated against, on both Count Available Questions and Generate Session. The form's effective maximum is `min(max_question_count, available_questions)`."
                         }
                       },
                       "required": [
@@ -6667,7 +6714,7 @@
       "post": {
         "summary": "Count Available Questions",
         "deprecated": false,
-        "description": "How many questions a given set of filters would actually yield for this student, so the form can tell them before they commit rather than only refusing afterwards. Call it whenever the Generate Session form's filters change.\n\nCounted with exactly the query generation draws from, so the two can never disagree. Nothing is created.\n\nThe body is the same one Generate Session takes — `title` and `question_count` are still required and validated, but `title` is ignored here and `question_count` is used only to compute `can_generate`.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
+        "description": "How many questions a given set of filters would actually yield for this student, so the form can tell them before they commit rather than only refusing afterwards. Call it whenever the Generate Session form's filters change.\n\nCounted with exactly the query generation draws from, so the two can never disagree. Nothing is created.\n\nThis endpoint no longer shares Generate Session's own requirements, only its filter semantics. **`title` is not required** — counting names nothing — and it is still accepted and ignored, so a client already sending one keeps working. **`question_count` is optional**: send it when the form needs to know whether a specific size could be generated, omit it when the form only needs the availability figure.\n\nWith a `question_count`, `requested_question_count` echoes it and `can_generate` is `available_questions >= question_count`. Without one, `requested_question_count` is `null` and `can_generate` reports only whether a session could be generated at all (`available_questions >= min_question_count`, which is 1).\n\nThe frontend's effective maximum for the size field is `min(max_question_count, available_questions)` — `max_question_count` from Get Fellowship Filters is the configurable system ceiling, `available_questions` is what these filters actually hold.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
         "operationId": "student.fellowships.available-questions",
         "tags": [
           "Fellowships · Filters & Availability"
@@ -6705,7 +6752,7 @@
           }
         ],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
@@ -6714,13 +6761,15 @@
                   "title": {
                     "type": "string",
                     "maxLength": 255,
-                    "description": "Required. The session's name, at most 255 characters. Trimmed."
+                    "description": "Optional and ignored. Accepted only so a client written against the previously shared request body keeps working; counting does not name anything. At most 255 characters when sent.",
+                    "nullable": true
                   },
                   "question_count": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 200,
-                    "description": "Required. How many questions to draw. Between `min_question_count` (1) and `max_question_count` (200 by default; the live ceiling is reported by Get Fellowship Filters)."
+                    "description": "Optional. How many questions the student is asking about. When sent it must be between `min_question_count` (1) and `max_question_count` (200 by default; the live ceiling is reported by Get Fellowship Filters), and it drives `requested_question_count` and `can_generate`. Omit it to ask only how many questions the filters hold.",
+                    "nullable": true
                   },
                   "timer_enabled": {
                     "type": "boolean",
@@ -6760,10 +6809,7 @@
                     }
                   }
                 },
-                "required": [
-                  "title",
-                  "question_count"
-                ],
+                "required": [],
                 "x-apidog-orders": [
                   "title",
                   "question_count",
@@ -6774,14 +6820,11 @@
                 ]
               },
               "example": {
-                "title": "Cardiology revision — set 3",
-                "question_count": 20,
-                "timer_enabled": true,
                 "difficulties": [
-                  "easy",
-                  "medium"
+                  "hard"
                 ],
-                "question_status": "unanswered",
+                "question_status": "all",
+                "question_count": 5,
                 "filters": {
                   "12": [
                     43,
@@ -6797,7 +6840,7 @@
         },
         "responses": {
           "200": {
-            "description": "The pool these filters would draw from.",
+            "description": "The pool these filters would draw from. With `question_count` omitted, `requested_question_count` is `null`: `{\"available_questions\": 7, \"requested_question_count\": null, \"can_generate\": true}`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6823,11 +6866,13 @@
                           "description": "How many questions these filters yield for this student right now."
                         },
                         "requested_question_count": {
-                          "type": "integer"
+                          "type": "integer",
+                          "nullable": true,
+                          "description": "The `question_count` that was sent, echoed back unchanged, or `null` when none was sent. Never invented."
                         },
                         "can_generate": {
                           "type": "boolean",
-                          "description": "`available_questions >= requested_question_count`."
+                          "description": "With a `question_count`: `available_questions >= question_count`. Without one: whether a session could be generated at all, i.e. `available_questions >= min_question_count` (1)."
                         }
                       },
                       "required": [
@@ -6857,8 +6902,8 @@
                   "success": true,
                   "message": "Success.",
                   "data": {
-                    "available_questions": 134,
-                    "requested_question_count": 20,
+                    "available_questions": 7,
+                    "requested_question_count": 5,
                     "can_generate": true
                   }
                 }
@@ -6891,7 +6936,7 @@
             "x-apidog-ordering": 2
           },
           "422": {
-            "description": "Validation failed — for example a filter value that belongs to another Fellowship.",
+            "description": "Validation failed — a filter value belonging to another Fellowship, an unknown difficulty, or a `question_count` outside 1…`max_question_count`. A missing `title` is no longer a validation failure.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6924,7 +6969,7 @@
       "post": {
         "summary": "Generate Fellowship Session",
         "deprecated": false,
-        "description": "Generates a new quiz session over this Fellowship's bank and returns it with its full question list and the question the student starts on. Call it when the Generate Session form is submitted.\n\n**Filtering.** Only `title` and `question_count` are required; every narrowing is optional and omitting one means All, so a request with nothing but a title and a count draws from the whole bank. `filters` is keyed by filter id. `question_status` selects answered, unanswered or all questions for this student. `difficulties` narrows by difficulty.\n\n**All-or-nothing.** If the filters cannot fill `question_count`, nothing is created and the `422 FELLOWSHIP_INSUFFICIENT_QUESTIONS` response reports `errors.available_questions` so the form can say what it could have given them.\n\n**Ordering.** The generated question order is fixed at creation and the session is answered through it in sequence; `current_position` is persisted, so reviewing earlier answers does not move the student's place.\n\n**Timer.** With `timer_enabled` the session snapshots the platform's per-question limit into `question_time_limit_seconds`; raising the platform limit later never re-judges a running session. There is no total session limit, and the per-question verdict is advisory.\n\nA student may hold any number of sessions on one Fellowship. Fellowship sessions are a separate flow from chapter quiz attempts.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
+        "description": "Generates a new quiz session over this Fellowship's bank and returns it with its full question list and the question the student starts on. Call it when the Generate Session form is submitted.\n\n**Filtering.** Only `title` and `question_count` are required; every narrowing is optional and omitting one means All, so a request with nothing but a title and a count draws from the whole bank. `filters` is keyed by filter id. `question_status` selects answered, unanswered or all questions for this student. `difficulties` narrows by difficulty.\n\n**All-or-nothing.** If the filters cannot fill `question_count`, nothing is created and the `422 FELLOWSHIP_INSUFFICIENT_QUESTIONS` response reports `errors.available_questions` so the form can say what it could have given them.\n\n**Ordering.** The generated question order is fixed at creation and the session is answered through it in sequence; `current_position` is persisted, so reviewing earlier answers does not move the student's place.\n\n**Timer.** With `timer_enabled` the session snapshots the platform's per-question limit into `question_time_limit_seconds`; raising the platform limit later never re-judges a running session. There is no total session limit, and the per-question verdict is advisory. The first question's clock starts with the session, at generation — its `activated_at` is the session's own `started_at`, so the frontend should show the first question as soon as this response arrives rather than after a further call.\n\nA student may hold any number of sessions on one Fellowship. Fellowship sessions are a separate flow from chapter quiz attempts.\n\n**Authentication** — requires a Sanctum bearer token (`Authorization: Bearer <token>`). The whole `/student` tree is behind `auth:sanctum`; an unauthenticated call is answered with `401`.",
         "operationId": "student.fellowships.sessions.store",
         "tags": [
           "Fellowships · Sessions & Questions"

@@ -9,6 +9,7 @@ use App\Enums\FellowshipImportStatus;
 use App\Enums\QuizDifficulty;
 use App\Exceptions\Fellowship\FellowshipImportException;
 use App\Models\Fellowship;
+use App\Models\FellowshipFilter;
 use App\Models\FellowshipImport;
 use App\Models\FellowshipImportRow;
 use App\Models\FellowshipQuestion;
@@ -137,6 +138,66 @@ class FellowshipImportConfirmationTest extends FellowshipTestCase
             ['Cardiology', 'Neurology'],
             $fellowship->performanceFilter->values()->pluck('value')->all(),
         );
+    }
+
+    public function test_an_import_lands_on_a_performance_filter_an_admin_designated_by_hand(): void
+    {
+        // The designation an admin makes on the Filters tab is the same fact
+        // the first import would have written, so an import into a bank already
+        // set up by hand must reuse it rather than fork the classification —
+        // whatever the file happens to call the column.
+        $fellowship = Fellowship::factory()->create();
+
+        /** @var FellowshipFilter $manual */
+        $manual = $fellowship->filters()->create(['name' => 'Performance Topic', 'is_performance' => true]);
+        $fellowship->update(['performance_filter_id' => $manual->getKey()]);
+        $manual->values()->create(['value' => 'Cardiology']);
+
+        $this->confirm($this->stage($fellowship, [
+            $this->row('One?', area: 'Cardiology'),
+            $this->row('Two?', area: 'Neurology'),
+        ]));
+
+        $fellowship->refresh();
+
+        $this->assertSame($manual->getKey(), $fellowship->performance_filter_id);
+        $this->assertSame('Performance Topic', $fellowship->performanceFilter->name, 'The column must not rename it.');
+        $this->assertSame(1, $fellowship->filters()->where('is_performance', true)->count());
+        $this->assertSame(
+            ['Cardiology', 'Neurology'],
+            $fellowship->performanceFilter->values()->pluck('value')->all(),
+        );
+        $this->assertSame(
+            1,
+            $fellowship->performanceFilter->values()->where('value', 'Cardiology')->count(),
+            'The hand-made value must be reused, not duplicated.',
+        );
+        $this->assertSame(2, $fellowship->questions()->whereNotNull('performance_filter_value_id')->count());
+    }
+
+    public function test_an_import_reuses_a_dynamic_filter_an_admin_created_by_hand(): void
+    {
+        $fellowship = $this->fellowship();
+        $system = $this->dynamicFilter($fellowship, 'System', ['Cardiovascular']);
+
+        // The file's column maps onto the filter that already exists.
+        $this->confirm($this->stage(
+            $fellowship,
+            [$this->row('One?', system: 'Cardiovascular'), $this->row('Two?', system: 'Respiratory')],
+            $this->map([
+                'System' => [
+                    'target' => FellowshipImportMappingTarget::ExistingFilter->value,
+                    'filter_id' => $system->getKey(),
+                ],
+            ]),
+        ));
+
+        $this->assertSame(1, $fellowship->filters()->where('name', 'System')->count(), 'The filter must not fork.');
+        $this->assertEqualsCanonicalizing(
+            ['Cardiovascular', 'Respiratory'],
+            $system->refresh()->values()->pluck('value')->all(),
+        );
+        $this->assertSame(2, $system->questionFilterValues()->count());
     }
 
     public function test_a_later_import_maps_a_differently_named_column_onto_the_same_performance_filter(): void

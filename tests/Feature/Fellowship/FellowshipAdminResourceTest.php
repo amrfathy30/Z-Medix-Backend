@@ -156,6 +156,10 @@ class FellowshipAdminResourceTest extends FellowshipTestCase
     public function test_a_hand_written_question_needs_a_performance_topic(): void
     {
         $fellowship = $this->fellowship();
+        // A topic to choose from, so what is being tested is the refusal to
+        // leave the classification blank rather than there being nothing to
+        // pick — authoring is blocked outright until the bank has one.
+        $this->topicValue($fellowship, 'Cardiology');
 
         $this->createQuestion($fellowship, [
             'question_text' => 'Which antiplatelet?',

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\FellowshipResource\RelationManagers;
 
 use App\Enums\QuizDifficulty;
 use App\Models\Fellowship;
+use App\Models\FellowshipFilter;
 use App\Models\FellowshipQuestion;
 use App\Support\Fellowship\FellowshipQuestionFormFields;
 use App\Support\Fellowship\SavesQuestionFilterValues;
@@ -151,6 +152,13 @@ class QuestionsRelationManager extends RelationManager
                 // stripped from the payload and written against the saved
                 // question afterwards.
                 CreateAction::make()
+                    // Every question carries exactly one Performance Topic, so
+                    // there is nothing to author until the Fellowship has that
+                    // classification with a value under it. Blocked here, with
+                    // the reason, rather than behind a required select the
+                    // admin has no way of filling.
+                    ->disabled(fn (): bool => self::authoringBlockedReason($fellowship) !== null)
+                    ->tooltip(fn (): ?string => self::authoringBlockedReason($fellowship))
                     ->using(function (array $data) use ($fellowship): FellowshipQuestion {
                         ['data' => $attributes, 'filters' => $filters] = $this->extractFilterValues($data);
 
@@ -181,6 +189,29 @@ class QuestionsRelationManager extends RelationManager
                 RestoreAction::make(),
             ])
             ->defaultSort('id', 'desc');
+    }
+
+    /**
+     * Why a question cannot be written by hand yet, or null when it can.
+     *
+     * The classification is designated either by the first confirmed import or
+     * by hand on the Filters tab; either way a question needs a value of it to
+     * be filed under.
+     */
+    public static function authoringBlockedReason(Fellowship $fellowship): ?string
+    {
+        /** @var FellowshipFilter|null $filter */
+        $filter = $fellowship->performanceFilter()->first();
+
+        if ($filter === null) {
+            return __('admin.fellowship.question_needs_performance_filter');
+        }
+
+        if (! $filter->values()->exists()) {
+            return __('admin.fellowship.question_needs_performance_topic_value');
+        }
+
+        return null;
     }
 
     /** @return array<string, string> */

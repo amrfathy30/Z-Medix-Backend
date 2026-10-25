@@ -95,6 +95,46 @@ class FellowshipFilterService
     }
 
     /**
+     * Bring the Fellowship's designation into line with this filter's own flag.
+     *
+     * The designation is one fact held on two rows — `filters.is_performance`
+     * and `fellowships.performance_filter_id` — so whichever side was just
+     * written, this is what makes the other agree. An import writes both
+     * through {@see resolvePerformanceFilter()}; an admin editing the filter
+     * directly writes only the flag, and this follows it.
+     *
+     * A Fellowship has exactly one Performance Topic classification, so
+     * designating a filter withdraws the designation from any other. Whether
+     * the move is allowed at all is decided before the write, where the admin
+     * can be told why — every question's required topic is a value of the
+     * filter being moved away from.
+     */
+    public function applyPerformanceDesignation(Fellowship $fellowship, FellowshipFilter $filter): void
+    {
+        $this->assertFilterBelongsTo($fellowship, $filter);
+
+        if (! $filter->is_performance) {
+            if ($fellowship->performance_filter_id === $filter->getKey()) {
+                $fellowship->update(['performance_filter_id' => null]);
+                $fellowship->setRelation('performanceFilter', null);
+            }
+
+            return;
+        }
+
+        $fellowship->filters()
+            ->whereKeyNot($filter->getKey())
+            ->where('is_performance', true)
+            ->update(['is_performance' => false]);
+
+        if ($fellowship->performance_filter_id !== $filter->getKey()) {
+            $fellowship->update(['performance_filter_id' => $filter->getKey()]);
+        }
+
+        $fellowship->setRelation('performanceFilter', $filter);
+    }
+
+    /**
      * The filter's value with this text, created if it has none.
      *
      * The length check guards the creation and not the lookup, which is the
