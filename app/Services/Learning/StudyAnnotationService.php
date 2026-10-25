@@ -208,19 +208,27 @@ class StudyAnnotationService
     // marked up across every subject rather than on one page.
 
     /**
+     * @param  list<int>  $subjectIds
      * @return LengthAwarePaginator<int, StudentHighlight>
      */
-    public function highlightCollection(User $student, ?Subject $subject = null, ?Chapter $chapter = null, int $perPage = 15): LengthAwarePaginator
+    public function highlightCollection(User $student, ?Subject $subject = null, ?Chapter $chapter = null, int $perPage = 15, array $subjectIds = [], ?string $search = null): LengthAwarePaginator
     {
-        return $this->paginateCollection(StudentHighlight::query(), $student, $subject, $chapter, $perPage);
+        $query = StudentHighlight::query()
+            ->when($search !== null && $search !== '', fn (Builder $query): Builder => $query->where('selected_text', 'LIKE', '%'.$search.'%'));
+
+        return $this->paginateCollection($query, $student, $subject, $chapter, $perPage, $subjectIds);
     }
 
     /**
+     * @param  list<int>  $subjectIds
      * @return LengthAwarePaginator<int, StudentNote>
      */
-    public function noteCollection(User $student, ?Subject $subject = null, ?Chapter $chapter = null, int $perPage = 15): LengthAwarePaginator
+    public function noteCollection(User $student, ?Subject $subject = null, ?Chapter $chapter = null, int $perPage = 15, array $subjectIds = [], ?string $search = null): LengthAwarePaginator
     {
-        return $this->paginateCollection(StudentNote::query(), $student, $subject, $chapter, $perPage);
+        $query = StudentNote::query()
+            ->when($search !== null && $search !== '', fn (Builder $query): Builder => $query->where('content', 'LIKE', '%'.$search.'%'));
+
+        return $this->paginateCollection($query, $student, $subject, $chapter, $perPage, $subjectIds);
     }
 
     /**
@@ -249,6 +257,7 @@ class StudyAnnotationService
      * @template TModel of StudentHighlight|StudentNote|StudentBookmark
      *
      * @param  Builder<TModel>  $query
+     * @param  list<int>  $subjectIds
      * @return LengthAwarePaginator<int, TModel>
      */
     private function paginateCollection(
@@ -257,6 +266,7 @@ class StudyAnnotationService
         ?Subject $subject,
         ?Chapter $chapter,
         int $perPage,
+        array $subjectIds = [],
     ): LengthAwarePaginator {
         $chapterIds = $this->access->accessibleChapterIds($student, $subject);
 
@@ -272,6 +282,10 @@ class StudyAnnotationService
                 'chapterPage',
                 fn (Builder $page): Builder => $page->whereIn('chapter_id', $chapterIds),
             )
+            ->when($subjectIds !== [], fn (Builder $query): Builder => $query->whereHas(
+                'chapterPage.chapter',
+                fn (Builder $chapter): Builder => $chapter->whereIn('subject_id', $subjectIds),
+            ))
             ->with(['chapterPage.chapter.subject'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')

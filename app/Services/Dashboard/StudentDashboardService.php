@@ -18,6 +18,7 @@ use App\Services\Fellowship\FellowshipAnalyticsService;
 use App\Services\Learning\StudyAccessService;
 use App\Services\Learning\StudyResumeService;
 use App\Services\Learning\SubjectAnalyticsService;
+use App\Services\Subscription\FeatureAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
@@ -45,20 +46,21 @@ class StudentDashboardService
      * Continue Learning and the Subjects section ask the same two questions
      * about the same subject — how far through it the student is, and which
      * chapter they are on — so the answers are kept rather than queried twice.
-     * The service is resolved per request and reads one student, which is what
-     * makes a key of the subject id alone sufficient.
+     * The service is resolved per request; keys include the student and subject
+     * so figures cannot cross between students.
      *
-     * @var array<int, array{completed_chapters: int, total_chapters: int, percentage: float}>
+     * @var array<string, array{completed_chapters: int, total_chapters: int, percentage: float}>
      */
     private array $chapterProgress = [];
 
     /**
-     * @var array<int, Chapter|null>
+     * @var array<string, Chapter|null>
      */
     private array $currentChapters = [];
 
     public function __construct(
         private StudyAccessService $access,
+        private FeatureAccessService $features,
         private StudyResumeService $resume,
         private SubjectAnalyticsService $subjectAnalytics,
         private FellowshipAnalyticsService $fellowshipAnalytics,
@@ -82,9 +84,10 @@ class StudentDashboardService
      */
     public function continueLearning(User $student, int $limit): array
     {
+        $codes = $this->features->denialCodesFor($student);
         $items = [
-            ...$this->continuableSubjects($student, $limit),
-            ...$this->continuableFellowships($student, $limit),
+            ...($codes['library'] === null ? $this->continuableSubjects($student, $limit) : []),
+            ...($codes['question_bank'] === null ? $this->continuableFellowships($student, $limit) : []),
         ];
 
         // Newest activity first. Two items recorded in the same second are
@@ -212,12 +215,13 @@ class StudentDashboardService
      */
     public function recentActivity(User $student, int $limit): array
     {
+        $codes = $this->features->denialCodesFor($student);
         $activities = [
-            ...$this->completedQuizActivity($student, $limit),
-            ...$this->completedFellowshipSessionActivity($student, $limit),
-            ...$this->completedChapterActivity($student, $limit),
-            ...$this->studySessionActivity($student, $limit),
-            ...$this->bookmarkActivity($student, $limit),
+            ...($codes['library'] === null ? $this->completedQuizActivity($student, $limit) : []),
+            ...($codes['question_bank'] === null ? $this->completedFellowshipSessionActivity($student, $limit) : []),
+            ...($codes['library'] === null ? $this->completedChapterActivity($student, $limit) : []),
+            ...($codes['library'] === null ? $this->studySessionActivity($student, $limit) : []),
+            ...($codes['library'] === null ? $this->bookmarkActivity($student, $limit) : []),
         ];
 
         usort(
@@ -491,7 +495,7 @@ class StudentDashboardService
      */
     private function chapterProgressFor(User $student, Subject $subject): array
     {
-        return $this->chapterProgress[$subject->getKey()] ??= $this->subjectAnalytics->chapterProgress($student, $subject);
+        return $this->chapterProgress[$student->getKey().':'.$subject->getKey()] ??= $this->subjectAnalytics->chapterProgress($student, $subject);
     }
 
     /**
@@ -501,11 +505,13 @@ class StudentDashboardService
      */
     private function currentChapterFor(User $student, Subject $subject): ?Chapter
     {
-        if (array_key_exists($subject->getKey(), $this->currentChapters)) {
-            return $this->currentChapters[$subject->getKey()];
+        $key = $student->getKey().':'.$subject->getKey();
+
+        if (array_key_exists($key, $this->currentChapters)) {
+            return $this->currentChapters[$key];
         }
 
-        return $this->currentChapters[$subject->getKey()] = $this->access->currentAccessibleChapter($student, $subject);
+        return $this->currentChapters[$key] = $this->access->currentAccessibleChapter($student, $subject);
     }
 
     /**

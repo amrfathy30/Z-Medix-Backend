@@ -36,15 +36,20 @@ class BookController extends Controller
 
     /**
      * Published books across every accessible subject, without page content.
+     * A nonempty subject_ids selection takes precedence over legacy subject_id.
      */
     public function collection(Request $request): JsonResponse
     {
         $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'subject_id' => ['nullable', 'integer', 'min:1'],
+            'subject_ids' => ['sometimes', 'array'],
+            'subject_ids.*' => ['required', 'integer', 'min:1'],
         ]);
 
         $perPage = min(max((int) $request->integer('per_page', 15), 1), 100);
+
+        $subjectIds = $request->input('subject_ids', []);
 
         $books = Book::query()
             ->published()
@@ -54,8 +59,8 @@ class BookController extends Controller
                 fn ($query) => $query->where('title', 'LIKE', '%'.$request->string('search')->toString().'%'),
             )
             ->when(
-                $request->filled('subject_id'),
-                fn ($query) => $query->where('subject_id', $request->integer('subject_id')),
+                $subjectIds !== [] || $request->filled('subject_id'),
+                fn ($query) => $query->whereIn('subject_id', $subjectIds !== [] ? $subjectIds : [$request->integer('subject_id')]),
             )
             ->with(['subject:id,name', 'media'])
             ->withCount('pages')

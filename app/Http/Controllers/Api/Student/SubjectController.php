@@ -65,7 +65,9 @@ class SubjectController extends Controller
 
         $perPage = min(max((int) $request->integer('per_page', 15), 1), 50);
 
-        $subjects = Subject::query()
+        $withoutPagination = $request->boolean('without_pagenation');
+
+        $query = Subject::query()
             ->published()
             ->when(
                 $request->filled('search'),
@@ -73,17 +75,20 @@ class SubjectController extends Controller
             )
             ->withCount(['publishedChapters', 'publishedBooks'])
             ->orderBy('name')
-            ->orderBy('id')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy('id');
 
-        $subjectIds = $subjects->getCollection()->pluck('id')->all();
+        $subjects = $withoutPagination
+            ? $query->with('media')->get()
+            : $query->paginate($perPage)->withQueryString();
+        $collection = $withoutPagination ? $subjects : $subjects->getCollection();
+
+        $subjectIds = $collection->pluck('id')->all();
         $studentId = $request->user()->getKey();
 
         $completed = $this->completedChaptersBySubject($studentId, $subjectIds);
         $current = $this->currentChapterBySubject($studentId, $subjectIds);
 
-        $subjects->getCollection()->transform(
+        $collection->transform(
             fn (Subject $subject): SubjectListItemResource => new SubjectListItemResource(
                 $subject,
                 (int) ($completed[$subject->getKey()] ?? 0),
@@ -91,7 +96,9 @@ class SubjectController extends Controller
             ),
         );
 
-        return $this->paginatedResponse(SubjectListItemResource::collection($subjects));
+        return $withoutPagination
+            ? $this->successResponse(SubjectListItemResource::collection($collection))
+            : $this->paginatedResponse(SubjectListItemResource::collection($subjects));
     }
 
     /**

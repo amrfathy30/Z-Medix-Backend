@@ -40,7 +40,11 @@ class EnsurePlanFeature
         try {
             $this->access->assertHasFeature($student, $planFeature);
         } catch (SubscriptionException $exception) {
-            return $this->errorResponse($exception->getMessage(), [], $exception->status, $exception->errorCode);
+            $status = in_array($exception->errorCode, ['SUBSCRIPTION_REQUIRED', 'FEATURE_NOT_IN_PLAN'], true)
+                ? Response::HTTP_OK
+                : $exception->status;
+
+            return $this->errorResponse($exception->getMessage(), [], $status, $exception->errorCode);
         }
 
         return $next($request);

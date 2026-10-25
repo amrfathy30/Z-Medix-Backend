@@ -50,8 +50,8 @@ Route::get('subscription', [SubscriptionController::class, 'show'])->name('subsc
 Route::post('subscription-requests', [SubscriptionRequestController::class, 'store'])->name('subscription-requests.store');
 
 // Everything below is gated by the student's plan. The `feature` middleware
-// refuses with 403 `SUBSCRIPTION_REQUIRED` when there is no active subscription
-// and 403 `FEATURE_NOT_IN_PLAN` when the plan lacks the feature, so a route here
+// responds with HTTP 200 and `SUBSCRIPTION_REQUIRED` when there is no active subscription
+// and `FEATURE_NOT_IN_PLAN` when the plan lacks the feature, so a route here
 // is never reachable on frontend state alone.
 //
 //   case_report   -> Case Report

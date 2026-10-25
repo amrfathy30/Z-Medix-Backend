@@ -25,6 +25,25 @@ class FeatureAccessService
         return StudentSubscription::query()->where('user_id', $student->getKey())->first();
     }
 
+    /**
+     * A request-local snapshot; null means the feature is available.
+     *
+     * @return array<string, string|null>
+     */
+    public function denialCodesFor(User $student): array
+    {
+        $period = $this->currentPeriod($student);
+        $codes = [];
+
+        foreach (PlanFeature::cases() as $feature) {
+            $codes[$feature->value] = $period === null
+                ? 'SUBSCRIPTION_REQUIRED'
+                : ($period->plan->hasFeature($feature) ? null : 'FEATURE_NOT_IN_PLAN');
+        }
+
+        return $codes;
+    }
+
     public function statusFor(User $student): SubscriptionStatus
     {
         return $this->subscriptionFor($student)?->status() ?? SubscriptionStatus::None;

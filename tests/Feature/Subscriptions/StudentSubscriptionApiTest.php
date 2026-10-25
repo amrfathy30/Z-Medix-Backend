@@ -410,7 +410,7 @@ class StudentSubscriptionApiTest extends SubscriptionTestCase
         $this->postJson(self::REQUESTS, ['plan_id' => $plan->id, 'billing_cycle' => 'monthly'])->assertCreated();
 
         // Asking is not paying: nothing is unlocked until the admin records it.
-        $this->getJson('/api/student/study/subjects')->assertForbidden();
+        $this->getJson('/api/student/study/subjects')->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
         $this->assertSame(SubscriptionRequestStatus::Pending, SubscriptionRequest::query()->first()->status);
         $this->assertSame(BillingCycle::Monthly, SubscriptionRequest::query()->first()->billing_cycle);
         $this->assertDatabaseCount('student_subscriptions', 0);
