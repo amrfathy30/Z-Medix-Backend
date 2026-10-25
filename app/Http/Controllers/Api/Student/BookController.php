@@ -56,7 +56,7 @@ class BookController extends Controller
     }
 
     /**
-     * One book: a PDF book with its file, a content book with its page count.
+     * One book: a PDF book with its file, a content book with its page index.
      */
     public function show(Request $request, Book $book): JsonResponse
     {
@@ -66,15 +66,15 @@ class BookController extends Controller
             return $this->studyErrorResponse($exception);
         }
 
+        if ($book->isContent()) {
+            $book->load(['pages' => fn ($query) => $query->select('id', 'book_id', 'order')]);
+        }
+
         return $this->successResponse(new BookResource($book));
     }
 
     /**
-     * A content book's pages, in order and paginated.
-     *
-     * `position` is derived from the page's place in the listing rather than
-     * counted per row, so a long book costs one query for the page of results
-     * and one for the total.
+     * A content book's complete ordered page index, without bodies.
      *
      * A PDF book has no pages: it is refused here rather than answered with an
      * empty list, so a client cannot mistake "wrong reader" for "empty book".
@@ -91,19 +91,14 @@ class BookController extends Controller
             return $this->studyErrorResponse($exception);
         }
 
-        $perPage = min(max((int) $request->integer('per_page', 15), 1), 50);
-
-        $pages = $book->pages()->paginate($perPage);
-
-        $offset = ($pages->firstItem() ?? 1) - 1;
-
-        $pages->getCollection()->transform(
+        $pages = $book->pages()->get(['id', 'book_id', 'order'])->map(
             fn (BookPage $page, int $index): BookPageResource => new BookPageResource(
                 $page,
-                $offset + $index + 1,
+                $index + 1,
+                withContent: false,
             ),
         );
 
-        return $this->paginatedResponse(BookPageResource::collection($pages));
+        return $this->successResponse($pages);
     }
 }

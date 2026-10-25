@@ -10,9 +10,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * A platform book opened.
  *
- * A PDF book hands over its file; a content book's pages are read through the
- * page endpoint. The other type's fields are null rather than absent, so the
- * client's shape does not change between the two.
+ * A PDF book hands over its file; a content book hands over an ordered page
+ * index without bodies. Each body is read through the individual page endpoint.
  *
  * `pages_count` is the book's length whichever kind it is — counted from the
  * page rows of a content book, the admin's own figure for a PDF one, and null
@@ -46,6 +45,11 @@ class BookResource extends JsonResource
             'pdf_file_name' => $isPdf ? $this->pdfFileName() : null,
             'pages_count' => $this->totalPages(),
             'cover_image' => $this->coverUrl(),
+            'pages' => $isPdf ? [] : $this->pages->map(fn ($page, int $index) => new BookPageResource(
+                $page,
+                $index + 1,
+                withContent: false,
+            )),
         ];
     }
 }
