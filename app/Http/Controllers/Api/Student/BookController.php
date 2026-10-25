@@ -35,6 +35,39 @@ class BookController extends Controller
     public function __construct(private StudyAccessService $access) {}
 
     /**
+     * Published books across every accessible subject, without page content.
+     */
+    public function collection(Request $request): JsonResponse
+    {
+        $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'subject_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $perPage = min(max((int) $request->integer('per_page', 15), 1), 100);
+
+        $books = Book::query()
+            ->published()
+            ->whereHas('subject', fn ($query) => $query->published())
+            ->when(
+                $request->filled('search'),
+                fn ($query) => $query->where('title', 'LIKE', '%'.$request->string('search')->toString().'%'),
+            )
+            ->when(
+                $request->filled('subject_id'),
+                fn ($query) => $query->where('subject_id', $request->integer('subject_id')),
+            )
+            ->with(['subject:id,name', 'media'])
+            ->withCount('pages')
+            ->orderBy('order')
+            ->orderBy('id')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return $this->paginatedResponse(BookListItemResource::collection($books));
+    }
+
+    /**
      * The subject's published books, in the order the admin arranged them.
      */
     public function index(Request $request, Subject $subject): JsonResponse

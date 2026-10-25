@@ -63,6 +63,10 @@ Route::get('report-cases', [ReportCaseController::class, 'index'])
     ->middleware('feature:case_report')
     ->name('report-cases.index');
 
+Route::get('books', [BookController::class, 'collection'])
+    ->middleware('feature:library')
+    ->name('books.index');
+
 // The study flow. Every route validates that the requested content is
 // accessible to this student right now; navigation itself is the frontend's.
 Route::prefix('study')->middleware('feature:library')->name('study.')->group(function (): void {
