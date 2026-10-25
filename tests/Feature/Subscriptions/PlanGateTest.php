@@ -3,11 +3,16 @@
 namespace Tests\Feature\Subscriptions;
 
 use App\Enums\PlanFeature;
+use App\Exceptions\Subscription\SubscriptionException;
 use App\Models\Plan;
 use App\Models\StudentSubscription;
+use App\Models\Subject;
 use App\Models\User;
 use App\Services\Subscription\FeatureAccessService;
 use Database\Factories\SubscriptionPeriodFactory;
+use Illuminate\Support\Facades\Route;
+use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 
 /**
  * The plan is enforced by the backend: a student reaches Library, Question Bank
@@ -42,7 +47,7 @@ class PlanGateTest extends SubscriptionTestCase
 
         foreach ([self::LIBRARY, self::PRIVATE_BOOKS, self::QUESTION_BANK, self::CASE_REPORT] as $url) {
             $this->getJson($url)
-                ->assertForbidden()
+                ->assertOk()
                 ->assertJsonPath('success', false)
                 ->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
         }
@@ -63,7 +68,7 @@ class PlanGateTest extends SubscriptionTestCase
         // A subject id that does not exist must not be a 404 here: that would
         // tell a student without a plan which ids are real.
         $this->getJson(self::LIBRARY.'/999999')
-            ->assertForbidden()
+            ->assertOk()
             ->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
     }
 
@@ -83,7 +88,7 @@ class PlanGateTest extends SubscriptionTestCase
         $this->getJson(self::QUESTION_BANK)->assertOk();
 
         $this->getJson(self::CASE_REPORT)
-            ->assertForbidden()
+            ->assertOk()
             ->assertJsonPath('code', 'FEATURE_NOT_IN_PLAN');
     }
 
@@ -99,12 +104,12 @@ class PlanGateTest extends SubscriptionTestCase
     {
         $this->actingAsStudent($this->unsubscribedStudent());
 
-        $this->postJson('/api/student/study/sessions', ['subject_id' => 1])->assertForbidden();
-        $this->getJson('/api/student/study/highlights')->assertForbidden();
-        $this->postJson('/api/student/private-books', [])->assertForbidden();
-        $this->getJson('/api/student/fellowships/1/filters')->assertForbidden();
-        $this->postJson('/api/student/fellowships/1/sessions', [])->assertForbidden();
-        $this->getJson('/api/student/fellowship-sessions/1')->assertForbidden();
+        $this->postJson('/api/student/study/sessions', ['subject_id' => 1])->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+        $this->getJson('/api/student/study/highlights')->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+        $this->postJson('/api/student/private-books', [])->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+        $this->getJson('/api/student/fellowships/1/filters')->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+        $this->postJson('/api/student/fellowships/1/sessions', [])->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+        $this->getJson('/api/student/fellowship-sessions/1')->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
     }
 
     public function test_a_plan_without_library_blocks_library_routes(): void
@@ -114,8 +119,8 @@ class PlanGateTest extends SubscriptionTestCase
         $this->actingAsStudent($this->subscribedStudent($plan));
 
         $this->getJson(self::CASE_REPORT)->assertOk();
-        $this->getJson(self::LIBRARY)->assertForbidden()->assertJsonPath('code', 'FEATURE_NOT_IN_PLAN');
-        $this->getJson(self::PRIVATE_BOOKS)->assertForbidden()->assertJsonPath('code', 'FEATURE_NOT_IN_PLAN');
+        $this->getJson(self::LIBRARY)->assertOk()->assertJsonPath('code', 'FEATURE_NOT_IN_PLAN');
+        $this->getJson(self::PRIVATE_BOOKS)->assertOk()->assertJsonPath('code', 'FEATURE_NOT_IN_PLAN');
     }
 
     // ─── Time and state ─────────────────────────────────────────────────────
@@ -127,7 +132,7 @@ class PlanGateTest extends SubscriptionTestCase
 
         $this->actingAsStudent($student);
 
-        $this->getJson(self::LIBRARY)->assertForbidden()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+        $this->getJson(self::LIBRARY)->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
     }
 
     public function test_a_cancelled_subscription_is_refused_even_inside_a_paid_period(): void
@@ -137,7 +142,7 @@ class PlanGateTest extends SubscriptionTestCase
 
         $this->actingAsStudent($student);
 
-        $this->getJson(self::LIBRARY)->assertForbidden()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+        $this->getJson(self::LIBRARY)->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
     }
 
     public function test_a_period_that_has_not_started_yet_grants_nothing(): void
@@ -151,7 +156,7 @@ class PlanGateTest extends SubscriptionTestCase
 
         $this->actingAsStudent($student);
 
-        $this->getJson(self::LIBRARY)->assertForbidden()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+        $this->getJson(self::LIBRARY)->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
     }
 
     public function test_access_ends_exactly_when_the_period_does(): void
@@ -169,7 +174,7 @@ class PlanGateTest extends SubscriptionTestCase
         $this->getJson(self::LIBRARY)->assertOk();
 
         $this->travelTo($period->ends_at);
-        $this->getJson(self::LIBRARY)->assertForbidden();
+        $this->getJson(self::LIBRARY)->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
     }
 
     public function test_a_payment_recorded_after_a_refusal_takes_effect_on_the_next_request(): void
@@ -177,7 +182,7 @@ class PlanGateTest extends SubscriptionTestCase
         $student = $this->unsubscribedStudent();
         $this->actingAsStudent($student);
 
-        $this->getJson(self::LIBRARY)->assertForbidden();
+        $this->getJson(self::LIBRARY)->assertOk()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
 
         $this->subscribe($student, $this->basic());
 
@@ -205,6 +210,65 @@ class PlanGateTest extends SubscriptionTestCase
         $this->actingAsStudent($student);
 
         $this->getJson(self::CASE_REPORT)->assertOk();
+    }
+
+    public function test_denied_lists_and_details_preserve_the_existing_empty_error_envelope(): void
+    {
+        $this->actingAsStudent($this->unsubscribedStudent());
+
+        foreach ([self::LIBRARY, self::LIBRARY.'/999999', self::QUESTION_BANK, self::PRIVATE_BOOKS, self::CASE_REPORT] as $url) {
+            $this->getJson($url)->assertOk()->assertExactJson([
+                'success' => false,
+                'message' => 'An active subscription is required to access this.',
+                'errors' => [],
+                'code' => 'SUBSCRIPTION_REQUIRED',
+            ]);
+        }
+    }
+
+    public function test_subscribed_subjects_return_content_and_keep_validation_and_not_found_errors(): void
+    {
+        $subject = Subject::factory()->create();
+        $this->actingAsStudent($this->subscribedStudent($this->basic()));
+
+        $this->getJson(self::LIBRARY)->assertOk()->assertJsonPath('data.0.id', $subject->id)->assertJsonPath('success', true);
+        $this->postJson('/api/student/study/sessions', [])->assertUnprocessable();
+        $this->getJson(self::LIBRARY.'/999999')->assertNotFound();
+    }
+
+    #[DataProvider('genuineErrorStatuses')]
+    public function test_the_feature_gate_does_not_convert_downstream_errors(int $status): void
+    {
+        Route::get('/api/student/entitlement-error-probe', static fn () => abort($status))
+            ->middleware(['api', 'auth:sanctum', 'feature:library']);
+        $this->actingAsStudent($this->subscribedStudent($this->basic()));
+
+        $this->getJson('/api/student/entitlement-error-probe')->assertStatus($status);
+    }
+
+    public static function genuineErrorStatuses(): array
+    {
+        return [[403], [404], [422], [500], [503]];
+    }
+
+    public function test_failure_loading_entitlements_is_not_a_successful_denial(): void
+    {
+        $this->actingAsStudent($this->unsubscribedStudent());
+        $this->mock(FeatureAccessService::class, function ($mock): void {
+            $mock->shouldReceive('assertHasFeature')->once()->andThrow(new RuntimeException('Entitlement storage unavailable.'));
+        });
+
+        $this->getJson(self::LIBRARY)->assertStatus(500);
+    }
+
+    public function test_other_subscription_exceptions_keep_their_error_status(): void
+    {
+        $this->actingAsStudent($this->unsubscribedStudent());
+        $this->mock(FeatureAccessService::class, function ($mock): void {
+            $mock->shouldReceive('assertHasFeature')->once()->andThrow(SubscriptionException::planUnavailable());
+        });
+
+        $this->getJson(self::LIBRARY)->assertUnprocessable()->assertJsonPath('code', 'PLAN_UNAVAILABLE');
     }
 
     // ─── The access service ─────────────────────────────────────────────────

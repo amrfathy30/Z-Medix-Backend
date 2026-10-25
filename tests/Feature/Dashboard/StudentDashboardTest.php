@@ -3,21 +3,26 @@
 namespace Tests\Feature\Dashboard;
 
 use App\Enums\ContentStatus;
+use App\Enums\PlanFeature;
 use App\Enums\QuizDifficulty;
 use App\Models\Chapter;
 use App\Models\ChapterPage;
 use App\Models\Fellowship;
 use App\Models\FellowshipQuizSession;
+use App\Models\Plan;
 use App\Models\Question;
 use App\Models\QuizAttempt;
 use App\Models\ReportCase;
+use App\Models\StudentBookmark;
 use App\Models\StudentChapterPageProgress;
 use App\Models\StudentChapterProgress;
 use App\Models\StudentStudyPosition;
 use App\Models\StudySession;
 use App\Models\Subject;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Fellowship\StudentFellowshipTestCase;
 
 /**
@@ -70,6 +75,115 @@ class StudentDashboardTest extends StudentFellowshipTestCase
         foreach (['continue_learning', 'fellowships', 'subjects', 'report_cases', 'recent_activity'] as $section) {
             $this->assertSame([], $response->json("data.{$section}"), "`{$section}` is not an empty array.");
         }
+    }
+
+    #[DataProvider('dashboardEntitlements')]
+    public function test_sections_and_mixed_sources_only_query_and_return_entitled_content(array $features): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1, pages: 1, questions: 1);
+        $chapter = $subject->publishedChapters()->first();
+        $fellowship = $this->fellowship();
+        $this->question($fellowship);
+        $case = ReportCase::factory()->create();
+        $student = $this->actingAsStudent();
+
+        $attempt = $this->startQuiz($chapter);
+        $this->answerAllCorrectly($attempt['id'])->assertOk();
+        $this->endedStudySession($student, $subject);
+        StudentBookmark::factory()->create(['user_id' => $student->id, 'chapter_page_id' => $chapter->pages()->first()->id]);
+        $finished = $this->generateSession($fellowship, ['question_count' => 1]);
+        $this->answerAll($finished);
+        $this->generateSession($fellowship, ['question_count' => 1]);
+
+        if ($features === []) {
+            $student->studentSubscription()->delete();
+        } else {
+            $plan = Plan::factory()->withFeatures(...$features)->create();
+            $student->studentSubscription->periods()->update(['plan_id' => $plan->id]);
+        }
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $response = $this->getJson($this->dashboardUrl)->assertOk()->assertJsonPath('success', true);
+        $queries = implode("\n", array_column(DB::getQueryLog(), 'query'));
+        DB::disableQueryLog();
+
+        $expectedActivities = [];
+        $expectedContinue = [];
+        foreach ([
+            'library' => ['section' => 'subjects', 'id' => $subject->id, 'tables' => 'subjects|chapters|quiz_attempts|student_study_positions|student_bookmarks|study_sessions', 'continue' => 'subject', 'activity' => ['quiz_completed', 'chapter_completed', 'study_session_ended', 'bookmark_added']],
+            'question_bank' => ['section' => 'fellowships', 'id' => $fellowship->id, 'tables' => 'fellowships|fellowship_quiz_sessions|fellowship_questions', 'continue' => 'fellowship', 'activity' => ['fellowship_session_completed']],
+            'case_report' => ['section' => 'report_cases', 'id' => $case->id, 'tables' => 'report_cases'],
+        ] as $feature => $mapping) {
+            $allowed = in_array(PlanFeature::from($feature), $features, true);
+            $code = $allowed ? null : ($features === [] ? 'SUBSCRIPTION_REQUIRED' : 'FEATURE_NOT_IN_PLAN');
+            $response->assertJsonPath('data.code.'.$mapping['section'], $code);
+
+            if ($allowed) {
+                $response->assertJsonPath('data.'.$mapping['section'].'.0.id', $mapping['id']);
+                if (isset($mapping['continue'])) {
+                    $expectedContinue[] = $mapping['continue'];
+                    array_push($expectedActivities, ...$mapping['activity']);
+                }
+            } else {
+                $response->assertJsonPath('data.'.$mapping['section'], []);
+                $this->assertDoesNotMatchRegularExpression('/\b(?:from|join)\s+["`]?('.$mapping['tables'].')["`]?\b/i', $queries);
+            }
+
+            if ($feature !== 'case_report') {
+                $response->assertJsonPath('data.code.continue_learning.'.$feature, $code)
+                    ->assertJsonPath('data.code.recent_activity.'.$feature, $code);
+            }
+        }
+
+        $this->assertEqualsCanonicalizing($expectedContinue, array_column($response->json('data.continue_learning'), 'type'));
+        $this->assertEqualsCanonicalizing($expectedActivities, array_column($response->json('data.recent_activity'), 'type'));
+    }
+
+    public static function dashboardEntitlements(): array
+    {
+        return [
+            'unsubscribed' => [[]],
+            'library only' => [[PlanFeature::Library]],
+            'question bank only' => [[PlanFeature::QuestionBank]],
+            'case reports only' => [[PlanFeature::CaseReport]],
+            'all sections' => [[PlanFeature::Library, PlanFeature::QuestionBank, PlanFeature::CaseReport]],
+        ];
+    }
+
+    public function test_subscription_changes_take_effect_on_the_next_dashboard_and_profile_request(): void
+    {
+        $subject = $this->subjectWithChapters();
+        $fellowship = $this->fellowship();
+        $case = ReportCase::factory()->create();
+        $student = $this->actingAsStudent();
+        $subscription = $student->studentSubscription;
+        $period = $subscription->currentPeriod();
+
+        $this->getJson($this->dashboardUrl)->assertOk()
+            ->assertJsonPath('data.subjects.0.id', $subject->id)
+            ->assertJsonPath('data.fellowships.0.id', $fellowship->id)
+            ->assertJsonPath('data.report_cases.0.id', $case->id);
+
+        $plan = Plan::factory()->withFeatures(PlanFeature::Library)->create();
+        $period->update(['plan_id' => $plan->id]);
+        $this->getJson($this->dashboardUrl)->assertOk()
+            ->assertJsonPath('data.subjects.0.id', $subject->id)
+            ->assertJsonPath('data.fellowships', [])
+            ->assertJsonPath('data.report_cases', []);
+        $this->getJson('/api/public/profile')->assertOk()->assertJsonPath('data.subscription.plan.id', $plan->id);
+
+        $period->update(['ends_at' => now()]);
+        $this->getJson($this->dashboardUrl)->assertOk()->assertJsonPath('data.subjects', [])
+            ->assertJsonPath('data.code.subjects', 'SUBSCRIPTION_REQUIRED');
+        $this->getJson('/api/public/profile')->assertOk()->assertJsonPath('data.subscription.features', []);
+
+        $period->update(['ends_at' => now()->addDay()]);
+        $this->getJson($this->dashboardUrl)->assertOk()->assertJsonPath('data.subjects.0.id', $subject->id);
+        $subscription->update(['cancelled_at' => now()]);
+        $this->getJson($this->dashboardUrl)->assertOk()->assertJsonPath('data.subjects', []);
+        $this->getJson('/api/public/profile')->assertOk()->assertJsonPath('data.subscription.status', 'cancelled')
+            ->assertJsonPath('data.subscription.features', []);
     }
 
     // ─── Continue Learning ──────────────────────────────────────────────────

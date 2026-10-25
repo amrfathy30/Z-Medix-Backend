@@ -118,6 +118,7 @@ class SubjectDiscoveryTest extends StudyTestCase
     public function test_each_listed_subject_names_the_chapter_the_student_is_on(): void
     {
         $subject = $this->subjectWithChapters(chapters: 3, pages: 1);
+        $subject->update(['name' => 'Anatomy']);
         [$first, $second, $third] = $subject->chapters()->get()->all();
         $empty = Subject::factory()->create(['name' => 'Zzz Empty']);
 

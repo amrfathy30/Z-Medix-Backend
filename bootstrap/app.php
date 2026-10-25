@@ -38,7 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // Decide the plan before route-model binding runs, so a student without
-        // the feature gets the same 403 for every id rather than a 404 for ids
+        // the feature gets the same subscription restriction for every id rather than a 404 for ids
         // that do not exist, which would reveal which ones do.
         $middleware->prependToPriorityList(
             before: SubstituteBindings::class,

@@ -9,6 +9,7 @@ use App\Http\Resources\Api\Student\DashboardFellowshipResource;
 use App\Http\Resources\Api\Student\ReportCaseResource;
 use App\Http\Resources\Api\Student\SubjectListItemResource;
 use App\Services\Dashboard\StudentDashboardService;
+use App\Services\Subscription\FeatureAccessService;
 use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,13 +39,15 @@ class DashboardController extends Controller
 
     private const ACTIVITY_LIMIT = 5;
 
-    public function __construct(private StudentDashboardService $dashboard) {}
+    public function __construct(private StudentDashboardService $dashboard, private FeatureAccessService $access) {}
 
     public function __invoke(Request $request): JsonResponse
     {
         $student = $request->user();
 
-        $subjects = $this->dashboard->subjects($student, self::SECTION_LIMIT);
+        $codes = $this->access->denialCodesFor($student);
+        $subjects = $codes['library'] === null ? $this->dashboard->subjects($student, self::SECTION_LIMIT) : [];
+        $learningCodes = array_intersect_key($codes, array_flip(['library', 'question_bank']));
 
         return $this->successResponse([
             'continue_learning' => DashboardContinueLearningResource::collection(
@@ -55,7 +58,7 @@ class DashboardController extends Controller
                     $row['fellowship'],
                     $row['stats'],
                 ),
-                $this->dashboard->fellowships(self::SECTION_LIMIT),
+                $codes['question_bank'] === null ? $this->dashboard->fellowships(self::SECTION_LIMIT) : [],
             ),
             // The Subjects screen's own card, so the home screen and the full
             // list report a subject identically.
@@ -68,8 +71,15 @@ class DashboardController extends Controller
                 $subjects,
             ),
             'report_cases' => ReportCaseResource::collection(
-                $this->dashboard->reportCases(self::SECTION_LIMIT),
+                $codes['case_report'] === null ? $this->dashboard->reportCases(self::SECTION_LIMIT) : collect(),
             ),
+            'code' => [
+                'continue_learning' => $learningCodes,
+                'fellowships' => $codes['question_bank'],
+                'subjects' => $codes['library'],
+                'report_cases' => $codes['case_report'],
+                'recent_activity' => $learningCodes,
+            ],
             'recent_activity' => DashboardActivityResource::collection(
                 $this->dashboard->recentActivity($student, self::ACTIVITY_LIMIT),
             ),

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\Student;
 
 use App\Exceptions\Learning\StudyException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\Student\AnnotationCollectionRequest;
+use App\Http\Requests\Api\Student\SearchAnnotationCollectionRequest;
 use App\Http\Requests\Api\Student\StoreHighlightRequest;
 use App\Http\Resources\Api\Student\HighlightResource;
 use App\Models\ChapterPage;
@@ -64,18 +64,20 @@ class HighlightController extends Controller
 
     /**
      * The student's highlights across every subject, newest first — the dedicated
-     * collection screen. Optionally narrowed to one subject or chapter.
+     * collection screen. Optionally searched or narrowed to subjects or one chapter.
      *
      * Paginated, and listing only highlights on content the student may still
      * reach, which is the same rule the per-page listing above applies.
      */
-    public function collection(AnnotationCollectionRequest $request): JsonResponse
+    public function collection(SearchAnnotationCollectionRequest $request): JsonResponse
     {
         $highlights = $this->annotations->highlightCollection(
             $request->user(),
             $request->subject(),
             $request->chapter(),
             $request->perPage(),
+            $request->subjectIds(),
+            $request->search(),
         );
 
         $highlights->getCollection()->transform(

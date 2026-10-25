@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api;
 
 use App\Enums\PhoneStatus;
+use App\Http\Resources\Api\Student\CurrentSubscriptionResource;
 use App\Models\PhoneNumber;
 use App\Models\User;
 use App\Services\Media\MediaUploadService;
@@ -38,10 +39,11 @@ class UserProfileResource extends JsonResource
             'field_of_study' => $this->field_of_study,
             'profile_photo' => app(MediaUploadService::class)
                 ->getUrl($this->resource, User::PROFILE_PHOTO_COLLECTION),
-            //'type' => $this->type?->value,
+            // 'type' => $this->type?->value,
             'status' => $this->status?->value,
             'last_login_at' => $this->last_login_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
+            'subscription' => new CurrentSubscriptionResource($this->resource),
         ];
     }
 

@@ -370,6 +370,6 @@ class PlatformBookTest extends StudyTestCase
         Sanctum::actingAs(User::factory()->create());
 
         $this->getJson($this->studyUrl."/book-pages/{$page->id}")
-            ->assertForbidden()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
+            ->assertOk()->assertJsonPath('success', false)->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
     }
 }
