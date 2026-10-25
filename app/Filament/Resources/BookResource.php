@@ -8,16 +8,24 @@ use App\Filament\Resources\BookResource\Pages\EditBook;
 use App\Filament\Resources\BookResource\Pages\ViewBook;
 use App\Filament\Resources\BookResource\RelationManagers\PagesRelationManager;
 use App\Models\Book;
+use App\Services\Learning\BookService;
+use Filament\Actions\Action;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Books are reached through their subject, never from the sidebar, so this
@@ -63,13 +71,14 @@ class BookResource extends Resource
                         self::coverField(),
                     ]),
 
-                // Asked for PDF books only: a content book's pages are counted
-                // from its own rows, so a figure typed here could only
-                // contradict them.
                 Section::make(__('admin.learning.book_section_pdf'))
                     ->visible(fn (Get $get): bool => $get('type') === BookType::Pdf->value)
                     ->schema([
-                        self::totalPagesField(),
+                        TextEntry::make('pdf_file_name')
+                            ->label(__('admin.learning.field_book_pdf_file_name'))
+                            ->state(fn (?Book $record): ?string => $record?->pdfFileName())
+                            ->placeholder('—'),
+                        self::pdfPagesCountField(),
                     ]),
             ]);
     }
@@ -118,20 +127,65 @@ class BookResource extends Resource
             ->columnSpanFull();
     }
 
-    /**
-     * The page count of a PDF book, typed by the admin: nothing parses the file.
-     *
-     * Shown inside a section the book's type gates, never on its own, so a
-     * content book is not asked for a figure its page rows already answer.
-     */
-    public static function totalPagesField(): TextInput
+    public static function pdfPagesCountField(): TextInput
     {
-        return TextInput::make('total_pages')
+        return TextInput::make('pdf_pages_count')
             ->label(__('admin.learning.field_book_total_pages'))
-            ->helperText(__('admin.learning.book_total_pages_hint'))
             ->numeric()
-            ->minValue(1)
-            ->maxValue(100000);
+            ->disabled()
+            ->saved(false)
+            ->placeholder('—');
+    }
+
+    public static function uploadPdfAction(): Action
+    {
+        return Action::make('uploadPdf')
+            ->label(fn (Book $record): string => $record->hasPdf()
+                ? __('admin.learning.action_replace_pdf')
+                : __('admin.learning.action_upload_pdf'))
+            ->icon(Heroicon::OutlinedArrowUpTray)
+            ->visible(fn (Book $record): bool => $record->isPdf())
+            ->authorize(fn (Book $record): bool => self::canEdit($record))
+            ->schema([
+                FileUpload::make('pdf')
+                    ->label(__('admin.learning.field_book_pdf'))
+                    ->required()
+                    ->storeFiles(false)
+                    ->acceptedFileTypes(self::pdfMimeTypes())
+                    ->maxSize(self::pdfMaxSizeKb())
+                    ->helperText(__('admin.learning.book_pdf_upload_hint', [
+                        'size' => (int) round(self::pdfMaxSizeKb() / 1024),
+                    ])),
+            ])
+            ->action(function (array $data, Book $record, BookService $books, EditBook|ViewBook $livewire): void {
+                $file = $data['pdf'];
+                $file = is_array($file) ? reset($file) : $file;
+
+                if (! $file instanceof UploadedFile) {
+                    return;
+                }
+
+                try {
+                    $books->replacePdf($record, $file);
+                } catch (ValidationException $exception) {
+                    $statePath = $livewire->getSchema($livewire->getMountedActionSchemaName())->getStatePath();
+
+                    throw ValidationException::withMessages([
+                        $statePath.'.pdf' => $exception->errors()['pdf'],
+                    ]);
+                }
+
+                $record->refresh();
+
+                if ($livewire instanceof EditBook) {
+                    $livewire->refreshFormData(['pdf_pages_count']);
+                }
+
+                Notification::make()
+                    ->title(__('admin.learning.book_pdf_uploaded'))
+                    ->success()
+                    ->send();
+            });
     }
 
     /**

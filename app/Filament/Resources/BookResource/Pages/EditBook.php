@@ -17,6 +17,7 @@ class EditBook extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            BookResource::uploadPdfAction(),
             ViewAction::make(),
             DeleteAction::make(),
             ForceDeleteAction::make(),

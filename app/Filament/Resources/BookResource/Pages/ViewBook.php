@@ -7,12 +7,9 @@ use App\Enums\ContentStatus;
 use App\Filament\Resources\BookResource;
 use App\Filament\Resources\SubjectResource;
 use App\Models\Book;
-use App\Services\Learning\BookService;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\FileUpload;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmptyState;
@@ -20,8 +17,6 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Book workspace: an overview, then the content section its type calls for.
@@ -126,49 +121,7 @@ class ViewBook extends ViewRecord
                                 ->url(fn (Book $record): ?string => $record->pdfUrl())
                                 ->openUrlInNewTab(),
 
-                            // The file is handed to MediaUploadService untouched,
-                            // so the book_pdf collection — not the raw disk —
-                            // decides where it lands and what it replaces.
-                            Action::make('uploadPdf')
-                                ->label(fn (Book $record): string => $record->hasPdf()
-                                    ? __('admin.learning.action_replace_pdf')
-                                    : __('admin.learning.action_upload_pdf'))
-                                ->icon(Heroicon::OutlinedArrowUpTray)
-                                ->authorize(fn (Book $record): bool => BookResource::canEdit($record))
-                                ->schema([
-                                    FileUpload::make('pdf')
-                                        ->label(__('admin.learning.field_book_pdf'))
-                                        ->required()
-                                        ->storeFiles(false)
-                                        ->acceptedFileTypes(BookResource::pdfMimeTypes())
-                                        ->maxSize(BookResource::pdfMaxSizeKb())
-                                        ->helperText(__('admin.learning.book_pdf_upload_hint', [
-                                            'size' => (int) round(BookResource::pdfMaxSizeKb() / 1024),
-                                        ])),
-                                ])
-                                ->action(function (array $data, Book $record, BookService $books): void {
-                                    $file = $data['pdf'];
-                                    $file = is_array($file) ? reset($file) : $file;
-
-                                    if (! $file instanceof UploadedFile) {
-                                        return;
-                                    }
-
-                                    try {
-                                        $books->replacePdf($record, $file);
-                                    } catch (ValidationException $exception) {
-                                        throw ValidationException::withMessages([
-                                            $this->getMountedActionSchema()->getStatePath().'.pdf' => $exception->errors()['pdf'],
-                                        ]);
-                                    }
-
-                                    $record->unsetRelation('media');
-
-                                    Notification::make()
-                                        ->title(__('admin.learning.book_pdf_uploaded'))
-                                        ->success()
-                                        ->send();
-                                }),
+                            BookResource::uploadPdfAction(),
                         ])->key('book-pdf-actions'),
                     ]),
             ]);
