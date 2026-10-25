@@ -14,6 +14,7 @@ class PhoneVerificationOtp extends Model
 
     protected $fillable = [
         'phone_number_id',
+        'target_phone',
         'purpose',
         'code_hash',
         'status',

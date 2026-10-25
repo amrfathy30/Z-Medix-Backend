@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Public\AnalyticsController;
 use App\Http\Controllers\Api\Public\Auth\ChangePasswordController;
+use App\Http\Controllers\Api\Public\Auth\ChangePhoneController;
 use App\Http\Controllers\Api\Public\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\Public\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\Public\Auth\LoginController;
@@ -67,6 +68,12 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
         Route::post('email/verification-notification', [EmailVerificationController::class, 'send'])
             ->name('email.send');
         Route::post('change-password', ChangePasswordController::class)->name('change-password');
+        Route::post('change-phone', [ChangePhoneController::class, 'store'])
+            ->middleware('throttle:10,1')->name('change-phone');
+        Route::post('change-phone/verify', [ChangePhoneController::class, 'verify'])
+            ->middleware('throttle:10,1')->name('change-phone.verify');
+        Route::post('change-phone/resend', [ChangePhoneController::class, 'resend'])
+            ->middleware('throttle:10,1')->name('change-phone.resend');
 
         // Optional phone verification. Nothing on the platform is gated on a
         // verified phone number; these endpoints only let a student flip

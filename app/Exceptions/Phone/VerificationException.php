@@ -23,6 +23,16 @@ class VerificationException extends RuntimeException
         parent::__construct($message);
     }
 
+    public static function disabled(): self
+    {
+        return new self('Phone verification is currently disabled.', 'PHONE_OTP_DISABLED', Response::HTTP_SERVICE_UNAVAILABLE);
+    }
+
+    public static function alreadyVerified(): self
+    {
+        return new self('This phone number is already verified.', 'PHONE_ALREADY_VERIFIED');
+    }
+
     public static function noPendingOtp(): self
     {
         return new self(

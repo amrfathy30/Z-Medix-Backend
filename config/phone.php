@@ -2,6 +2,8 @@
 
 return [
 
+    'otp_enabled' => (bool) env('PHONE_OTP_ENABLED', true),
+
     /*
     |--------------------------------------------------------------------------
     | Default Country
