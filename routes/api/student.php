@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\FcmTopicController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Student\BookController;
 use App\Http\Controllers\Api\Student\BookmarkController;
+use App\Http\Controllers\Api\Student\BookPageController;
 use App\Http\Controllers\Api\Student\ChapterController;
 use App\Http\Controllers\Api\Student\ChapterPageController;
 use App\Http\Controllers\Api\Student\ChapterQuizController;
@@ -90,6 +91,7 @@ Route::prefix('study')->middleware('feature:library')->name('study.')->group(fun
     Route::get('subjects/{subject}/books', [BookController::class, 'index'])->name('subjects.books.index');
     Route::get('books/{book}', [BookController::class, 'show'])->name('books.show');
     Route::get('books/{book}/pages', [BookController::class, 'pages'])->name('books.pages');
+    Route::get('book-pages/{bookPage}', [BookPageController::class, 'show'])->name('book-pages.show');
 
     // The student's dedicated Highlights, Notes and Bookmarks area: what they
     // marked up across every subject, not on one page. Registered before the
@@ -195,4 +197,3 @@ Route::get('notifications', [NotificationController::class, 'index'])->name('not
 Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
 Route::patch('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 Route::patch('notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
-

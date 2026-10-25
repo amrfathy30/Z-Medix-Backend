@@ -9,15 +9,14 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * One page of a content book.
  *
- * `position` is supplied by the caller, which already knows where the page sits
- * in the listing it is building. Deriving it here would cost a count query per
- * page, which is exactly what a paginated reader must not do.
+ * The caller supplies the position from the ordered index or the page's
+ * positionInBook(). Index entries omit the body, just like chapter pages.
  *
  * @mixin BookPage
  */
 class BookPageResource extends JsonResource
 {
-    public function __construct($resource, private int $position)
+    public function __construct($resource, private int $position, private bool $withContent = true)
     {
         parent::__construct($resource);
     }
@@ -31,7 +30,7 @@ class BookPageResource extends JsonResource
             'id' => $this->id,
             'book_id' => $this->book_id,
             'position' => $this->position,
-            'content' => $this->content,
+            ...$this->withContent ? ['content' => $this->content] : [],
         ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services\Learning;
 
 use App\Exceptions\Learning\StudyAccessException;
 use App\Models\Book;
+use App\Models\BookPage;
 use App\Models\Chapter;
 use App\Models\ChapterPage;
 use App\Models\Quiz;
@@ -202,6 +203,24 @@ class StudyAccessService
 
         if (! $subject instanceof Subject || ! $this->canAccessSubject($student, $subject)) {
             throw StudyAccessException::subjectUnavailable();
+        }
+    }
+
+    /**
+     * A book page inherits its book's access rules and is only read as content.
+     */
+    public function assertCanAccessBookPage(User $student, BookPage $page): void
+    {
+        $book = $page->book;
+
+        if (! $book instanceof Book) {
+            throw StudyAccessException::bookUnavailable();
+        }
+
+        $this->assertCanAccessBook($student, $book);
+
+        if (! $book->isContent()) {
+            throw StudyAccessException::bookContentUnavailable();
         }
     }
 

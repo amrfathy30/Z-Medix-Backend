@@ -4,7 +4,9 @@ namespace Tests\Feature\Study;
 
 use App\Models\Book;
 use App\Models\BookPage;
+use App\Models\ChapterPage;
 use App\Models\Subject;
+use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
@@ -89,58 +91,176 @@ class PlatformBookTest extends StudyTestCase
             ->assertJsonPath('data.type', 'pdf')
             ->assertJsonPath('data.has_pdf', true)
             ->assertJsonPath('data.pdf_file_name', 'anatomy.pdf')
-            ->assertJsonPath('data.pages_count', null);
+            ->assertJsonPath('data.pages_count', null)
+            ->assertJsonPath('data.pages', []);
 
         $this->assertNotNull(
             $this->getJson($this->studyUrl."/books/{$book->id}")->json('data.pdf_url'),
         );
     }
 
-    public function test_a_content_book_serves_its_pages_in_order(): void
+    public function test_book_details_and_index_return_only_ordered_page_metadata(): void
     {
         $subject = $this->subjectWithChapters(chapters: 1);
         $book = Book::factory()->content()->create(['subject_id' => $subject->id]);
 
-        foreach (range(1, 3) as $index) {
-            BookPage::factory()->create([
-                'book_id' => $book->id,
-                'order' => $index,
-                'content' => "Page {$index} body",
-            ]);
-        }
+        $last = BookPage::factory()->create(['book_id' => $book->id, 'order' => 30]);
+        $first = BookPage::factory()->create(['book_id' => $book->id, 'order' => 10]);
+        $second = BookPage::factory()->create(['book_id' => $book->id, 'order' => 10]);
+        $deleted = BookPage::factory()->create(['book_id' => $book->id, 'order' => 5]);
+        $deleted->delete();
+        BookPage::factory()->create();
 
         Sanctum::actingAs($this->student());
+
+        $expected = collect([$first, $second, $last])->map(fn (BookPage $page, int $index): array => [
+            'id' => $page->id,
+            'book_id' => $book->id,
+            'position' => $index + 1,
+        ])->all();
+
+        $this->getJson($this->studyUrl."/books/{$book->id}")
+            ->assertOk()
+            ->assertJsonPath('data.pages', $expected)
+            ->assertJsonPath('data.pages_count', 3)
+            ->assertJsonPath('data.title', $book->title)
+            ->assertJsonPath('data.author', $book->author)
+            ->assertJsonPath('data.type', 'content')
+            ->assertJsonPath('data.has_pdf', false);
 
         $this->getJson($this->studyUrl."/books/{$book->id}/pages")
-            ->assertOk()
-            ->assertJsonCount(3, 'data')
-            ->assertJsonPath('data.0.position', 1)
-            ->assertJsonPath('data.0.content', 'Page 1 body')
-            ->assertJsonPath('data.2.position', 3)
-            ->assertJsonPath('data.2.content', 'Page 3 body');
+            ->assertExactJson([
+                'success' => true,
+                'message' => 'Success.',
+                'data' => $expected,
+            ]);
     }
 
-    /**
-     * Position follows the listing, so page 3 is page 3 on the second page of
-     * results too — not page 1 again.
-     */
-    public function test_page_positions_continue_across_pagination(): void
+    public function test_a_book_page_is_retrieved_by_id_with_exactly_one_body(): void
     {
-        $subject = $this->subjectWithChapters(chapters: 1);
-        $book = Book::factory()->content()->create(['subject_id' => $subject->id]);
-
-        foreach (range(1, 5) as $index) {
-            BookPage::factory()->create(['book_id' => $book->id, 'order' => $index]);
-        }
+        $book = Book::factory()->content()->create();
+        BookPage::factory()->create(['book_id' => $book->id, 'order' => 10]);
+        $page = BookPage::factory()->create([
+            'book_id' => $book->id,
+            'order' => 30,
+            'content' => '<p>Read <strong>one</strong> page.</p>',
+        ]);
+        BookPage::factory()->create(['book_id' => $book->id, 'order' => 40]);
 
         Sanctum::actingAs($this->student());
 
-        $this->getJson($this->studyUrl."/books/{$book->id}/pages?per_page=2&page=2")
+        $this->getJson($this->studyUrl."/book-pages/{$page->id}?page=99&per_page=50")
+            ->assertExactJson([
+                'success' => true,
+                'message' => 'Success.',
+                'data' => [
+                    'id' => $page->id,
+                    'book_id' => $book->id,
+                    'position' => 2,
+                    'content' => '<p>Read <strong>one</strong> page.</p>',
+                ],
+            ]);
+    }
+
+    public function test_book_page_ordering_matches_chapters_after_reordering(): void
+    {
+        $subject = $this->subjectWithChapters(chapters: 1, pages: 1);
+        $chapter = $subject->chapters()->first();
+        $chapter->pages()->delete();
+        $book = Book::factory()->content()->create(['subject_id' => $subject->id]);
+        $bookPages = [];
+        $chapterPages = [];
+
+        foreach ([30, 10, 10] as $order) {
+            $bookPages[] = BookPage::factory()->create(['book_id' => $book->id, 'order' => $order]);
+            $chapterPages[] = ChapterPage::factory()->create(['chapter_id' => $chapter->id, 'order' => $order]);
+        }
+
+        $bookPages[0]->update(['order' => 5]);
+        $chapterPages[0]->update(['order' => 5]);
+
+        Sanctum::actingAs($this->student());
+
+        $bookIndex = $this->getJson($this->studyUrl."/books/{$book->id}")
+            ->assertOk()->json('data.pages');
+        $chapterIndex = $this->getJson($this->studyUrl."/chapters/{$chapter->id}")
+            ->assertOk()->json('data.pages');
+
+        $this->assertSame(array_column($chapterIndex, 'position'), array_column($bookIndex, 'position'));
+        $this->assertSame(array_map(fn (BookPage $page): int => $page->id, $bookPages), array_column($bookIndex, 'id'));
+        $this->assertSame(array_map(fn (ChapterPage $page): int => $page->id, $chapterPages), array_column($chapterIndex, 'id'));
+
+        foreach ($bookIndex as $entry) {
+            $this->getJson($this->studyUrl."/book-pages/{$entry['id']}")
+                ->assertOk()
+                ->assertJsonPath('data.position', $entry['position']);
+        }
+    }
+
+    public function test_the_page_index_ignores_pagination_and_never_returns_bodies(): void
+    {
+        $book = Book::factory()->content()->create();
+        BookPage::factory()->count(52)->create(['book_id' => $book->id]);
+
+        Sanctum::actingAs($this->student());
+
+        $response = $this->getJson($this->studyUrl."/books/{$book->id}/pages?per_page=2&page=2")
             ->assertOk()
-            ->assertJsonCount(2, 'data')
-            ->assertJsonPath('data.0.position', 3)
-            ->assertJsonPath('data.1.position', 4)
-            ->assertJsonPath('meta.total', 5);
+            ->assertJsonCount(52, 'data')
+            ->assertJsonPath('data.0.position', 1)
+            ->assertJsonPath('data.51.position', 52)
+            ->assertJsonMissingPath('meta')
+            ->assertJsonMissingPath('links');
+
+        foreach ($response->json('data') as $entry) {
+            $this->assertSame(['id', 'book_id', 'position'], array_keys($entry));
+        }
+    }
+
+    public function test_soft_deleted_pages_cannot_be_read_and_do_not_occupy_positions(): void
+    {
+        $book = Book::factory()->content()->create();
+        $deleted = BookPage::factory()->create(['book_id' => $book->id, 'order' => 1]);
+        $remaining = BookPage::factory()->create(['book_id' => $book->id, 'order' => 2]);
+        $deleted->delete();
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/book-pages/{$deleted->id}")->assertNotFound();
+        $this->getJson($this->studyUrl."/book-pages/{$remaining->id}")
+            ->assertOk()
+            ->assertJsonPath('data.position', 1);
+    }
+
+    public function test_pages_of_soft_deleted_books_or_subjects_cannot_be_read(): void
+    {
+        $deletedBook = Book::factory()->content()->create();
+        $bookPage = BookPage::factory()->create(['book_id' => $deletedBook->id]);
+        $deletedBook->delete();
+
+        $book = Book::factory()->content()->create();
+        $subjectPage = BookPage::factory()->create(['book_id' => $book->id]);
+        $book->subject->delete();
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/book-pages/{$bookPage->id}")
+            ->assertNotFound()->assertJsonPath('code', 'BOOK_UNAVAILABLE');
+        $this->getJson($this->studyUrl."/book-pages/{$subjectPage->id}")
+            ->assertNotFound()->assertJsonPath('code', 'SUBJECT_UNAVAILABLE');
+    }
+
+    public function test_empty_content_books_have_empty_indexes(): void
+    {
+        $book = Book::factory()->content()->create();
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/books/{$book->id}")
+            ->assertOk()->assertJsonPath('data.pages', [])->assertJsonPath('data.pages_count', 0);
+        $this->getJson($this->studyUrl."/books/{$book->id}/pages")
+            ->assertOk()->assertJsonPath('data', []);
+        $this->getJson($this->studyUrl.'/book-pages/999999')->assertNotFound();
     }
 
     public function test_a_pdf_book_has_no_pages_to_list(): void
@@ -155,6 +275,19 @@ class PlatformBookTest extends StudyTestCase
             ->assertJsonPath('code', 'BOOK_CONTENT_UNAVAILABLE');
     }
 
+    public function test_a_pdf_book_cannot_expose_page_rows_through_the_individual_endpoint(): void
+    {
+        $book = Book::factory()->pdf()->create(['total_pages' => 240]);
+        $page = BookPage::factory()->create(['book_id' => $book->id]);
+
+        Sanctum::actingAs($this->student());
+
+        $this->getJson($this->studyUrl."/book-pages/{$page->id}")
+            ->assertNotFound()->assertJsonPath('code', 'BOOK_CONTENT_UNAVAILABLE');
+        $this->getJson($this->studyUrl."/books/{$book->id}")
+            ->assertOk()->assertJsonPath('data.pages', [])->assertJsonPath('data.pages_count', 240);
+    }
+
     public function test_an_unpublished_book_cannot_be_opened(): void
     {
         $subject = $this->subjectWithChapters(chapters: 1);
@@ -164,11 +297,17 @@ class PlatformBookTest extends StudyTestCase
         Sanctum::actingAs($this->student());
 
         foreach ([$draft, $archived] as $book) {
+            $page = BookPage::factory()->create(['book_id' => $book->id]);
+
             $this->getJson($this->studyUrl."/books/{$book->id}")
                 ->assertNotFound()
                 ->assertJsonPath('code', 'BOOK_UNAVAILABLE');
 
             $this->getJson($this->studyUrl."/books/{$book->id}/pages")
+                ->assertNotFound()
+                ->assertJsonPath('code', 'BOOK_UNAVAILABLE');
+
+            $this->getJson($this->studyUrl."/book-pages/{$page->id}")
                 ->assertNotFound()
                 ->assertJsonPath('code', 'BOOK_UNAVAILABLE');
         }
@@ -178,10 +317,15 @@ class PlatformBookTest extends StudyTestCase
     {
         $subject = Subject::factory()->draft()->create();
         $book = Book::factory()->content()->create(['subject_id' => $subject->id]);
+        $page = BookPage::factory()->create(['book_id' => $book->id]);
 
         Sanctum::actingAs($this->student());
 
         $this->getJson($this->studyUrl."/books/{$book->id}")
+            ->assertNotFound()
+            ->assertJsonPath('code', 'SUBJECT_UNAVAILABLE');
+
+        $this->getJson($this->studyUrl."/book-pages/{$page->id}")
             ->assertNotFound()
             ->assertJsonPath('code', 'SUBJECT_UNAVAILABLE');
 
@@ -198,21 +342,34 @@ class PlatformBookTest extends StudyTestCase
     {
         $subject = $this->subjectWithChapters(chapters: 3);
         $book = Book::factory()->content()->create(['subject_id' => $subject->id]);
-        BookPage::factory()->create(['book_id' => $book->id]);
+        $page = BookPage::factory()->create(['book_id' => $book->id]);
 
         Sanctum::actingAs($this->student());
 
         $this->getJson($this->studyUrl."/books/{$book->id}")->assertOk();
         $this->getJson($this->studyUrl."/books/{$book->id}/pages")->assertOk();
+        $this->getJson($this->studyUrl."/book-pages/{$page->id}")->assertOk();
     }
 
     public function test_book_endpoints_require_authentication(): void
     {
         $subject = $this->subjectWithChapters(chapters: 1);
         $book = Book::factory()->content()->create(['subject_id' => $subject->id]);
+        $page = BookPage::factory()->create(['book_id' => $book->id]);
 
         $this->getJson($this->studyUrl."/subjects/{$subject->id}/books")->assertUnauthorized();
         $this->getJson($this->studyUrl."/books/{$book->id}")->assertUnauthorized();
         $this->getJson($this->studyUrl."/books/{$book->id}/pages")->assertUnauthorized();
+        $this->getJson($this->studyUrl."/book-pages/{$page->id}")->assertUnauthorized();
+    }
+
+    public function test_individual_book_pages_require_a_subscription(): void
+    {
+        $page = BookPage::factory()->create();
+
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson($this->studyUrl."/book-pages/{$page->id}")
+            ->assertForbidden()->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED');
     }
 }
