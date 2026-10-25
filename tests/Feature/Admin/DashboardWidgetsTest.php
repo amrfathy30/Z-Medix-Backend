@@ -55,7 +55,13 @@ class DashboardWidgetsTest extends TestCase
 
         Livewire::actingAs($this->admin, 'admin')
             ->test(StatsOverviewWidget::class)
-            ->assertSuccessful();
+            ->assertSuccessful()
+            ->assertSee(__('admin.dashboard.total_students'))
+            ->assertSee(__('admin.dashboard.study_sessions'))
+            ->assertSee(__('admin.dashboard.fellowship_questions'))
+            ->assertSee(__('admin.dashboard.pending_contact'))
+            ->assertDontSee('Scheduled')
+            ->assertDontSee('مجدول');
     }
 
     public function test_student_growth_chart_widget_mounts_successfully(): void

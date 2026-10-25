@@ -35,6 +35,7 @@ class SubscriptionRequestResource extends JsonResource
             ],
             'pricing' => $snapshot,
             'created_at' => $this->created_at?->toIso8601String(),
+            'handled_at' => $this->handled_at?->toIso8601String(),
         ];
     }
 }

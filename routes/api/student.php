@@ -50,6 +50,7 @@ Route::get('plans', [PlanController::class, 'index'])->name('plans.index');
 Route::get('subscription', [SubscriptionController::class, 'show'])->name('subscription.show');
 Route::post('subscription/promo-code/validate', PromoCodeController::class)->middleware('throttle:30,1')->name('subscription.promo-code.validate');
 Route::post('subscription-requests', [SubscriptionRequestController::class, 'store'])->name('subscription-requests.store');
+Route::get('subscription-requests', [SubscriptionRequestController::class, 'index'])->name('subscription-requests.index');
 
 // Everything below is gated by the student's plan. The `feature` middleware
 // responds with HTTP 200 and `SUBSCRIPTION_REQUIRED` when there is no active subscription

@@ -91,11 +91,6 @@ final class SubscriptionPeriodForm
                 ->default(now())
                 ->required(),
 
-            DateTimePicker::make('starts_at')
-                ->label(__('admin.subscriptions.field_starts_at'))
-                ->helperText(__('admin.subscriptions.starts_at_hint'))
-                ->seconds(false),
-
             Textarea::make('notes')
                 ->label(__('admin.subscriptions.field_notes'))
                 ->rows(3)
@@ -171,7 +166,6 @@ final class SubscriptionPeriodForm
             amount: $data['amount'],
             proof: $proof,
             paidAt: filled($data['paid_at'] ?? null) ? Carbon::parse($data['paid_at']) : null,
-            startsAt: filled($data['starts_at'] ?? null) ? Carbon::parse($data['starts_at']) : null,
             currency: filled($data['currency'] ?? null) ? strtoupper($data['currency']) : null,
             notes: $data['notes'] ?? null,
             recordedBy: auth('admin')->user(),

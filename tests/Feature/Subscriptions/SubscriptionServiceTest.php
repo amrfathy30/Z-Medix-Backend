@@ -13,7 +13,6 @@ use App\Models\SubscriptionRequest;
 use App\Models\User;
 use App\Services\Subscription\RecordedPayment;
 use App\Services\Subscription\SubscriptionService;
-use Carbon\CarbonInterface;
 use Database\Factories\SubscriptionPeriodFactory;
 use Illuminate\Support\Facades\Storage;
 
@@ -36,7 +35,6 @@ class SubscriptionServiceTest extends SubscriptionTestCase
         User $student,
         Plan $plan,
         BillingCycle $cycle = BillingCycle::Monthly,
-        ?CarbonInterface $startsAt = null,
         ?SubscriptionRequest $request = null,
         string|float $amount = 9.99,
     ): SubscriptionPeriod {
@@ -46,7 +44,6 @@ class SubscriptionServiceTest extends SubscriptionTestCase
             cycle: $cycle,
             amount: $amount,
             proof: SubscriptionPeriodFactory::fakeProof(),
-            startsAt: $startsAt,
             request: $request,
         ));
     }
@@ -139,7 +136,7 @@ class SubscriptionServiceTest extends SubscriptionTestCase
 
     // ─── Renewals and upgrades ──────────────────────────────────────────────
 
-    public function test_a_renewal_continues_from_where_the_coverage_ends(): void
+    public function test_a_renewal_starts_immediately_even_with_remaining_coverage(): void
     {
         $this->travelTo('2026-03-10 12:00:00');
         $student = $this->unsubscribedStudent();
@@ -149,8 +146,8 @@ class SubscriptionServiceTest extends SubscriptionTestCase
         $this->travelTo('2026-03-25 12:00:00');
         $second = $this->pay($student, $plan);
 
-        $this->assertTrue($second->starts_at->equalTo($first->ends_at));
-        $this->assertSame('2026-05-10 12:00:00', $second->ends_at->toDateTimeString());
+        $this->assertTrue($second->starts_at->equalTo(now()));
+        $this->assertSame('2026-04-25 12:00:00', $second->ends_at->toDateTimeString());
         $this->assertSame(1, StudentSubscription::query()->count(), 'Renewals add periods, not subscriptions.');
         $this->assertSame(2, $first->subscription->periods()->count());
     }
@@ -170,7 +167,7 @@ class SubscriptionServiceTest extends SubscriptionTestCase
         $this->assertSame(SubscriptionStatus::Active, $renewal->subscription->status());
     }
 
-    public function test_the_start_can_be_set_to_begin_an_upgrade_immediately(): void
+    public function test_an_upgrade_begins_immediately(): void
     {
         $this->travelTo('2026-03-10 12:00:00');
         $student = $this->unsubscribedStudent();
@@ -179,28 +176,27 @@ class SubscriptionServiceTest extends SubscriptionTestCase
 
         $this->pay($student, $basic);
         $this->travelTo('2026-03-12 12:00:00');
-        $upgrade = $this->pay($student, $premium, startsAt: now());
+        $upgrade = $this->pay($student, $premium);
 
         $this->assertSame('2026-03-12 12:00:00', $upgrade->starts_at->toDateTimeString());
         // The upgrade started last, so it decides the plan while it runs.
         $this->assertTrue($upgrade->subscription->currentPeriod()->plan->is($premium));
     }
 
-    public function test_a_period_can_be_paid_ahead_and_does_not_grant_access_until_it_starts(): void
+    public function test_a_payment_date_does_not_control_activation(): void
     {
-        $this->travelTo('2026-03-10 12:00:00');
-        $student = $this->unsubscribedStudent();
-        $basic = Plan::factory()->basic()->create();
-        $premium = Plan::factory()->premium()->create();
+        $this->travelTo('2026-03-10 12:34:56');
+        $period = $this->service->recordPeriod(new RecordedPayment(
+            student: $this->unsubscribedStudent(),
+            plan: Plan::factory()->basic()->create(),
+            cycle: BillingCycle::Monthly,
+            amount: 10,
+            proof: SubscriptionPeriodFactory::fakeProof(),
+            paidAt: now()->addDays(5),
+        ));
 
-        $this->pay($student, $basic);
-        $queued = $this->pay($student, $premium);
-
-        // Queued behind the Basic month, so today is still Basic.
-        $this->assertTrue($queued->subscription->currentPeriod()->plan->is($basic));
-
-        $this->travelTo($queued->starts_at->copy()->addMinute());
-        $this->assertTrue($queued->subscription->currentPeriod()->plan->is($premium));
+        $this->assertTrue($period->starts_at->equalTo(now()));
+        $this->assertTrue($period->subscription->isActive());
     }
 
     // ─── Cancelling ─────────────────────────────────────────────────────────

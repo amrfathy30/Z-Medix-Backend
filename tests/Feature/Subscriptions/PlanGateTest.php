@@ -149,7 +149,9 @@ class PlanGateTest extends SubscriptionTestCase
     {
         $student = $this->unsubscribedStudent();
         $subscription = StudentSubscription::factory()->for($student, 'user')->create();
-        SubscriptionPeriodFactory::new()->upcoming()->create([
+        SubscriptionPeriodFactory::new()->create([
+            'starts_at' => now()->addDays(5),
+            'ends_at' => now()->addDays(5)->addMonthNoOverflow(),
             'student_subscription_id' => $subscription->id,
             'plan_id' => $this->premium()->id,
         ]);

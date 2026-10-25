@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -95,6 +96,30 @@ class SubscriptionPeriod extends Model implements HasMedia
         $at ??= now();
 
         return $query->where('starts_at', '<=', $at)->where('ends_at', '>', $at);
+    }
+
+    /**
+     * The latest started period stays authoritative after it ends. A previous
+     * overlapping invoice must never resume granting access after a plan change.
+     */
+    public function scopeEffectiveAt(Builder $query, ?CarbonInterface $at = null): Builder
+    {
+        $at ??= now();
+        $table = $this->getTable();
+
+        return $query->where($table.'.starts_at', '<=', $at)
+            ->whereNotExists(function (QueryBuilder $later) use ($at, $table): void {
+                $later->select('later.id')->from($table.' as later')
+                    ->whereColumn('later.student_subscription_id', $table.'.student_subscription_id')
+                    ->where('later.starts_at', '<=', $at)
+                    ->where(function (QueryBuilder $order) use ($table): void {
+                        $order->whereColumn('later.starts_at', '>', $table.'.starts_at')
+                            ->orWhere(function (QueryBuilder $tie) use ($table): void {
+                                $tie->whereColumn('later.starts_at', $table.'.starts_at')
+                                    ->whereColumn('later.id', '>', $table.'.id');
+                            });
+                    });
+            });
     }
 
     public function proof(): ?Media
