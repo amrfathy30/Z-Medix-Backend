@@ -9,6 +9,7 @@ use App\Events\SubscriptionRejected;
 use App\Exceptions\Subscription\SubscriptionException;
 use App\Models\Admin;
 use App\Models\Plan;
+use App\Models\PromoCode;
 use App\Models\StudentSubscription;
 use App\Models\SubscriptionPeriod;
 use App\Models\SubscriptionRequest;
@@ -27,7 +28,7 @@ use Illuminate\Support\Facades\DB;
  */
 class SubscriptionService
 {
-    public function __construct(private MediaUploadService $media) {}
+    public function __construct(private MediaUploadService $media, private PromoCodeService $promos) {}
 
     /**
      * Records a student's request for a plan.
@@ -39,40 +40,65 @@ class SubscriptionService
      *
      * @throws SubscriptionException
      */
-    public function submitRequest(User $student, Plan $plan, BillingCycle $cycle): SubscriptionRequest
+    public function submitRequest(User $student, Plan $plan, BillingCycle $cycle, ?string $promoCode = null): SubscriptionRequest
     {
-        if (! $plan->is_active || $plan->trashed()) {
-            throw SubscriptionException::planUnavailable();
-        }
-
-        if (! $plan->offers($cycle)) {
-            throw SubscriptionException::cycleNotOffered();
-        }
-
-        return DB::transaction(function () use ($student, $plan, $cycle): SubscriptionRequest {
-            /** @var SubscriptionRequest|null $pending */
+        return DB::transaction(function () use ($student, $plan, $cycle, $promoCode): SubscriptionRequest {
+            User::query()->lockForUpdate()->findOrFail($student->getKey());
             $pending = SubscriptionRequest::query()
                 ->where('user_id', $student->getKey())
-                ->pending()
-                ->orderByDesc('id')
-                ->lockForUpdate()
-                ->first();
+                ->pending()->orderByDesc('id')->lockForUpdate()->first();
+            $plan = Plan::withTrashed()->lockForUpdate()->findOrFail($plan->getKey());
+            $this->promos->validatePlan($plan, $cycle);
+            $code = filled($promoCode) ? PromoCode::normalize($promoCode) : null;
 
-            if ($pending !== null) {
-                $pending->forceFill([
-                    'plan_id' => $plan->getKey(),
-                    'billing_cycle' => $cycle,
-                ])->save();
-
-                return $pending->refresh();
+            if ($pending !== null && $pending->plan_id === $plan->getKey()
+                && $pending->billing_cycle === $cycle && $pending->pricing_snapshot !== null
+                && ($pending->pricing_snapshot['code'] ?? null) === $code) {
+                return $pending;
             }
 
-            return SubscriptionRequest::query()->create([
+            if ($pending !== null) {
+                $this->transitionPromoUsage($pending, 'released');
+            }
+
+            $pricing = $code === null
+                ? ['code' => null] + $this->promos->pricing($plan, $cycle)
+                : $this->promos->validate($student, $plan, $cycle, $code, lock: true);
+            unset($pricing['valid']);
+            $attributes = [
                 'user_id' => $student->getKey(),
                 'plan_id' => $plan->getKey(),
                 'billing_cycle' => $cycle,
-            ]);
-        });
+                'pricing_snapshot' => $pricing,
+            ];
+            if ($pending !== null) {
+                $pending->forceFill($attributes)->save();
+                $request = $pending->refresh();
+            } else {
+                $request = SubscriptionRequest::query()->create($attributes);
+            }
+
+            if ($code !== null) {
+                $promo = PromoCode::query()->where('code', $code)->firstOrFail();
+                $request->promoCodeUsages()->create($pricing + [
+                    'promo_code_id' => $promo->getKey(),
+                    'user_id' => $student->getKey(),
+                    'plan_name' => $plan->name,
+                    'billing_cycle' => $cycle->value,
+                ]);
+            }
+
+            return $request;
+        }, attempts: 5);
+    }
+
+    private function transitionPromoUsage(SubscriptionRequest $request, string $status): void
+    {
+        $usages = $request->promoCodeUsages()->where('status', 'reserved')->lockForUpdate()->get();
+        foreach ($usages as $usage) {
+            PromoCode::withTrashed()->whereKey($usage->promo_code_id)->lockForUpdate()->firstOrFail();
+            $usage->update(['status' => $status]);
+        }
     }
 
     /**
@@ -97,6 +123,7 @@ class SubscriptionService
         }
 
         return DB::transaction(function () use ($payment, $request): SubscriptionPeriod {
+            User::query()->lockForUpdate()->findOrFail($payment->student->getKey());
             if ($request !== null) {
                 // Re-read under a lock so two admins approving the same request
                 // cannot both record a payment for it.
@@ -144,10 +171,11 @@ class SubscriptionService
                     'handled_by' => $payment->recordedBy?->getKey(),
                     'handled_at' => now(),
                 ])->save();
+                $this->transitionPromoUsage($request, 'consumed');
             }
 
             return $period;
-        });
+        }, attempts: 5);
 
         event(new SubscriptionApproved($payment->student, $payment->plan, $period));
 
@@ -160,6 +188,7 @@ class SubscriptionService
     public function rejectRequest(SubscriptionRequest $request, ?Admin $admin = null, ?string $note = null): SubscriptionRequest
     {
         $updatedRequest = DB::transaction(function () use ($request, $admin, $note): SubscriptionRequest {
+            User::query()->lockForUpdate()->findOrFail($request->user_id);
             $request = SubscriptionRequest::query()->lockForUpdate()->findOrFail($request->getKey());
 
             if (! $request->isPending()) {
@@ -173,8 +202,10 @@ class SubscriptionService
                 'handled_at' => now(),
             ])->save();
 
+            $this->transitionPromoUsage($request, 'released');
+
             return $request;
-        });
+        }, attempts: 5);
 
         $updatedRequest->loadMissing(['user', 'plan']);
         if ($updatedRequest->user !== null && $updatedRequest->plan !== null) {

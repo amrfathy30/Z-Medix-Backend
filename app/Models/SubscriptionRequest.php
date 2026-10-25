@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -27,6 +28,7 @@ class SubscriptionRequest extends Model
         'admin_note',
         'handled_by',
         'handled_at',
+        'pricing_snapshot',
     ];
 
     protected $attributes = [
@@ -39,6 +41,7 @@ class SubscriptionRequest extends Model
             'billing_cycle' => BillingCycle::class,
             'status' => SubscriptionRequestStatus::class,
             'handled_at' => 'datetime',
+            'pricing_snapshot' => 'array',
         ];
     }
 
@@ -54,6 +57,11 @@ class SubscriptionRequest extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class)->withTrashed();
+    }
+
+    public function promoCodeUsages(): HasMany
+    {
+        return $this->hasMany(PromoCodeUsage::class);
     }
 
     public function handledBy(): BelongsTo

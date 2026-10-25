@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Student\NoteController;
 use App\Http\Controllers\Api\Student\PlanController;
 use App\Http\Controllers\Api\Student\PrivateBookController;
 use App\Http\Controllers\Api\Student\PrivateBookPdfController;
+use App\Http\Controllers\Api\Student\PromoCodeController;
 use App\Http\Controllers\Api\Student\QuizAnswerController;
 use App\Http\Controllers\Api\Student\QuizAttemptController;
 use App\Http\Controllers\Api\Student\QuizAttemptHistoryController;
@@ -47,6 +48,7 @@ Route::get('dashboard', DashboardController::class)->name('dashboard');
 // which is how they find a plan, ask for it and see where the request stands.
 Route::get('plans', [PlanController::class, 'index'])->name('plans.index');
 Route::get('subscription', [SubscriptionController::class, 'show'])->name('subscription.show');
+Route::post('subscription/promo-code/validate', PromoCodeController::class)->middleware('throttle:30,1')->name('subscription.promo-code.validate');
 Route::post('subscription-requests', [SubscriptionRequestController::class, 'store'])->name('subscription-requests.store');
 
 // Everything below is gated by the student's plan. The `feature` middleware
