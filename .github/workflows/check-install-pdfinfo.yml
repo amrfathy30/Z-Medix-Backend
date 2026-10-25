@@ -1,49 +1,60 @@
+
 name: Check and Install PDFInfo
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  ensure-pdfinfo:
-    name: Ensure pdfinfo on server
+  install-pdfinfo:
+    name: Check PDFInfo on Z-Medix Server
     runs-on: ubuntu-latest
+
     steps:
-      - name: Check and install pdfinfo over SSH
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Check and Install PDFInfo using SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
+          port: 22
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_SSH_PORT || '22' }}
+          timeout: 60s
           command_timeout: 10m
           script: |
             set -eu
+
+            echo "=== Server Information ==="
+            whoami
+            hostname
+
+            echo "=== Checking PDFInfo ==="
+
             if command -v pdfinfo >/dev/null 2>&1; then
-              echo "pdfinfo already installed: $(command -v pdfinfo)"
+              echo "PDFInfo is already installed."
             else
-              echo "pdfinfo is missing. Installing poppler-utils..."
+              echo "PDFInfo not found. Installing poppler-utils..."
+
               if ! command -v apt-get >/dev/null 2>&1; then
-                echo "ERROR: This workflow supports Ubuntu/Debian (apt-get) only." >&2
+                echo "ERROR: apt-get not found. Ubuntu/Debian required."
                 exit 1
               fi
+
               if [ "$(id -u)" -eq 0 ]; then
                 apt-get update
                 DEBIAN_FRONTEND=noninteractive apt-get install -y poppler-utils
               else
-                if ! sudo -n true 2>/dev/null; then
-                  echo "ERROR: SSH user needs passwordless sudo to install packages." >&2
-                  exit 1
-                fi
                 sudo -n apt-get update
                 sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y poppler-utils
               fi
             fi
-            command -v pdfinfo >/dev/null 2>&1 || {
-              echo "ERROR: pdfinfo is still unavailable." >&2
+
+            echo "=== Final Verification ==="
+
+            if ! command -v pdfinfo >/dev/null 2>&1; then
+              echo "ERROR: PDFInfo installation failed."
               exit 1
-            }
-            echo "SUCCESS: pdfinfo available at $(command -v pdfinfo)"
+            fi
+
+            command -v pdfinfo
             pdfinfo -v
+
+            echo "SUCCESS: PDFInfo is ready."
