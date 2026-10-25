@@ -1,0 +1,49 @@
+name: Check and Install PDFInfo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ensure-pdfinfo:
+    name: Ensure pdfinfo on server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check and install pdfinfo over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT || '22' }}
+          command_timeout: 10m
+          script: |
+            set -eu
+            if command -v pdfinfo >/dev/null 2>&1; then
+              echo "pdfinfo already installed: $(command -v pdfinfo)"
+            else
+              echo "pdfinfo is missing. Installing poppler-utils..."
+              if ! command -v apt-get >/dev/null 2>&1; then
+                echo "ERROR: This workflow supports Ubuntu/Debian (apt-get) only." >&2
+                exit 1
+              fi
+              if [ "$(id -u)" -eq 0 ]; then
+                apt-get update
+                DEBIAN_FRONTEND=noninteractive apt-get install -y poppler-utils
+              else
+                if ! sudo -n true 2>/dev/null; then
+                  echo "ERROR: SSH user needs passwordless sudo to install packages." >&2
+                  exit 1
+                fi
+                sudo -n apt-get update
+                sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y poppler-utils
+              fi
+            fi
+            command -v pdfinfo >/dev/null 2>&1 || {
+              echo "ERROR: pdfinfo is still unavailable." >&2
+              exit 1
+            }
+            echo "SUCCESS: pdfinfo available at $(command -v pdfinfo)"
+            pdfinfo -v

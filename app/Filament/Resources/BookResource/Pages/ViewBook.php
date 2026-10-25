@@ -21,6 +21,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Book workspace: an overview, then the content section its type calls for.
@@ -153,7 +154,13 @@ class ViewBook extends ViewRecord
                                         return;
                                     }
 
-                                    $books->replacePdf($record, $file);
+                                    try {
+                                        $books->replacePdf($record, $file);
+                                    } catch (ValidationException $exception) {
+                                        throw ValidationException::withMessages([
+                                            $this->getMountedActionSchema()->getStatePath().'.pdf' => $exception->errors()['pdf'],
+                                        ]);
+                                    }
 
                                     $record->unsetRelation('media');
 

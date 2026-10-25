@@ -29,6 +29,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Platform books of the subject being viewed. Creating from here assigns
@@ -84,6 +85,16 @@ class BooksRelationManager extends RelationManager
                         SpatieMediaLibraryFileUpload::make('book_pdf')
                             ->label(__('admin.learning.field_book_pdf'))
                             ->collection(Book::PDF_COLLECTION)
+                            ->saveRelationshipsUsing(static function (SpatieMediaLibraryFileUpload $component): void {
+                                try {
+                                    $component->deleteAbandonedFiles();
+                                    $component->saveUploadedFiles();
+                                } catch (ValidationException $exception) {
+                                    throw ValidationException::withMessages([
+                                        $component->getStatePath() => $exception->errors()['book_pdf'],
+                                    ]);
+                                }
+                            })
                             ->acceptedFileTypes(BookResource::pdfMimeTypes())
                             ->maxSize(BookResource::pdfMaxSizeKb())
                             ->helperText(__('admin.learning.book_pdf_upload_hint', [

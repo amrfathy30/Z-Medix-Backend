@@ -50,6 +50,7 @@ class Book extends Model implements HasMedia
             'status' => ContentStatus::class,
             'order' => 'integer',
             'total_pages' => 'integer',
+            'pdf_pages_count' => 'integer',
         ];
     }
 
@@ -162,16 +163,14 @@ class Book extends Model implements HasMedia
     /**
      * How many pages the book has, whichever kind it is.
      *
-     * A content book is counted from its page rows. A PDF book keeps its
-     * material in one file that nothing here parses, so its figure is the one
-     * the admin typed, and null until they do — never a zero, which would claim
-     * an empty book.
+     * A content book is counted from its page rows. A PDF book uses the count
+     * extracted when its media was uploaded, or null until a count is available.
      */
     public function totalPages(): ?int
     {
         return $this->isContent()
             ? (int) ($this->pages_count ?? $this->pagesCount())
-            : $this->total_pages;
+            : $this->pdf_pages_count;
     }
 
     /**

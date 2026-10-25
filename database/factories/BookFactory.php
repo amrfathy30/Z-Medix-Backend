@@ -92,10 +92,35 @@ class BookFactory extends Factory
      * `$reportedKilobytes` overrides only the size validation sees, so an
      * oversized upload can be exercised without writing megabytes to disk.
      */
-    public static function fakePdf(string $fileName = 'book.pdf', ?int $reportedKilobytes = null): File
+    public static function fakePdf(string $fileName = 'book.pdf', ?int $reportedKilobytes = null, int $pages = 1): File
     {
         $handle = tmpfile();
-        fwrite($handle, "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+        $objects = [
+            '<< /Type /Catalog /Pages 2 0 R >>',
+            '<< /Type /Pages /Kids ['.implode(' ', array_map(fn (int $page): string => ($page + 2).' 0 R', range(1, $pages))).'] /Count '.$pages.' >>',
+        ];
+
+        for ($page = 1; $page <= $pages; $page++) {
+            $objects[] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << >> >>';
+        }
+
+        $pdf = "%PDF-1.4\n";
+        $offsets = [0];
+
+        foreach ($objects as $index => $object) {
+            $offsets[] = strlen($pdf);
+            $pdf .= ($index + 1)." 0 obj\n{$object}\nendobj\n";
+        }
+
+        $xref = strlen($pdf);
+        $pdf .= 'xref'."\n0 ".count($offsets)."\n0000000000 65535 f \n";
+
+        foreach (array_slice($offsets, 1) as $offset) {
+            $pdf .= sprintf("%010d 00000 n \n", $offset);
+        }
+
+        $pdf .= 'trailer << /Size '.count($offsets).' /Root 1 0 R >>'."\nstartxref\n{$xref}\n%%EOF\n";
+        fwrite($handle, $pdf);
 
         $file = new File($fileName, $handle);
         $file->mimeTypeToReport = 'application/pdf';
