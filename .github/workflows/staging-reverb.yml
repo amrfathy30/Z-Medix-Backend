@@ -5,15 +5,15 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: Manual service operation
-        type: choice
+        description: Reverb service action
         required: true
         default: status
+        type: choice
         options:
           - status
-          - start
-          - stop
+          - configure-and-start
           - restart
+          - stop
 
 permissions: {}
 
@@ -21,322 +21,506 @@ concurrency:
   group: zmedix-staging-services
   cancel-in-progress: false
 
-# Set SERVER_* secrets in Environment staging, never to production values.
-env:
-  APP_PATH: ${{ vars.STAGING_APP_PATH }}
-  PHP_BIN: ${{ vars.STAGING_PHP_BIN || 'php' }}
-  APP_USER: ${{ secrets.SERVER_USER }}
-  SUPERVISOR_CONFIG: ${{ vars.STAGING_SUPERVISOR_CONFIG }}
-  SUPERVISOR_CONFIG_DIR: ${{ vars.STAGING_SUPERVISOR_CONFIG_DIR }}
-  SUPERVISOR_SERVICE: ${{ vars.STAGING_SUPERVISOR_SERVICE }}
-  QUEUE_PROGRAM: ${{ vars.STAGING_QUEUE_PROGRAM }}
-  REVERB_PROGRAM: ${{ vars.STAGING_REVERB_PROGRAM }}
-
 jobs:
-  manage:
+  reverb:
     runs-on: ubuntu-latest
     environment: staging
-    timeout-minutes: 15
-    steps:
-      - name: Validate staging settings
-        env:
-          SELECTED_BRANCH: ${{ github.ref_name }}
-          REF_TYPE: ${{ github.ref_type }}
-          SSH_HOST: ${{ secrets.SERVER_HOST }}
-          SSH_USER: ${{ secrets.SERVER_USER }}
-          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-          SSH_FINGERPRINT: ${{ secrets.STAGING_SSH_FINGERPRINT }}
-          SSH_PORT: ${{ vars.STAGING_SSH_PORT || 22 }}
-        run: |
-          set -euo pipefail
-          [[ "$REF_TYPE" == branch && "$SELECTED_BRANCH" == master ]] || { echo 'Run this workflow from the master branch only.' >&2; exit 1; }
-          [[ "$PHP_BIN" == php || "$PHP_BIN" =~ ^/[a-zA-Z0-9_./-]+$ ]] || { echo 'Invalid PHP executable.' >&2; exit 1; }
-          : "${SSH_HOST:?Set staging SERVER_HOST}" "${SSH_USER:?Set staging SERVER_USER}" "${SSH_KEY:?Set staging SERVER_SSH_KEY}"
-          : "${SSH_FINGERPRINT:?Set STAGING_SSH_FINGERPRINT}" "${SSH_PORT:?Set STAGING_SSH_PORT}"
-          for value in "$APP_PATH" "$SUPERVISOR_CONFIG" "$SUPERVISOR_CONFIG_DIR"; do
-              [[ "$value" =~ ^/[a-zA-Z0-9_./-]+$ ]] || { echo 'Set absolute paths without whitespace/metacharacters.' >&2; exit 1; }
-          done
-          [[ "$APP_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
-          [[ "$QUEUE_PROGRAM" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
-          [[ "$REVERB_PROGRAM" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
-          [[ "$QUEUE_PROGRAM" != "$REVERB_PROGRAM" ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
-          [[ "$SUPERVISOR_SERVICE" =~ ^[a-zA-Z0-9_.@-]+$ ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
-          [[ "$SSH_PORT" =~ ^[0-9]+$ ]] && (( SSH_PORT >= 1 && SSH_PORT <= 65535 )) || { echo 'Invalid SSH port.' >&2; exit 1; }
+    timeout-minutes: 20
 
-      - name: Manage staging service over SSH
+    steps:
+      - name: Configure and manage Reverb
         uses: appleboy/ssh-action@v1.0.3
         env:
           ACTION: ${{ inputs.action }}
+          APP_PATH: ${{ vars.STAGING_APP_PATH || '/var/www/zmedix-backend' }}
+          PHP_BIN: ${{ vars.STAGING_PHP_BIN || 'php' }}
+          REVERB_PORT: ${{ vars.STAGING_REVERB_INTERNAL_PORT || '8081' }}
+          WS_HOST: ${{ vars.STAGING_WS_HOST }}
+          WS_ORIGINS: ${{ vars.STAGING_REVERB_ORIGINS }}
+          NGINX_SITE: ${{ vars.STAGING_NGINX_SITE }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT }}
           port: ${{ vars.STAGING_SSH_PORT || 22 }}
           timeout: 60s
-          command_timeout: 12m
-          envs: ACTION,APP_PATH,PHP_BIN,APP_USER,SUPERVISOR_CONFIG,SUPERVISOR_CONFIG_DIR,SUPERVISOR_SERVICE,QUEUE_PROGRAM,REVERB_PROGRAM
+          command_timeout: 15m
+          envs: ACTION,APP_PATH,PHP_BIN,REVERB_PORT,WS_HOST,WS_ORIGINS,NGINX_SITE
           script: |
             bash -se <<'REMOTE'
             set -euo pipefail
+
             fail() { echo "ERROR: $*" >&2; exit 1; }
 
-            # SSH access does not establish sudo rights.
-            as_root() {
-                command -v sudo >/dev/null || fail 'sudo is missing; administrator setup is required.'
-                sudo -n -l -- "$@" >/dev/null 2>&1 || fail "SERVER_USER lacks non-interactive sudo authorization for $1; ask the staging administrator to review sudo policy."
-                sudo -n -- "$@"
+            root() {
+              if [ "$(id -u)" -eq 0 ]; then
+                "$@"
+              else
+                sudo -n "$@"
+              fi
             }
 
-            [[ "$(id -un)" == "$APP_USER" && "$(id -u)" != 0 ]] || fail 'SERVER_USER must be the existing restricted application account.'
-            PHP_BIN=$(command -v "$PHP_BIN") || fail 'Configured PHP executable is unavailable to SERVER_USER.'
-            [[ -d "$APP_PATH" && -x "$PHP_BIN" ]] || fail 'Configured project directory or PHP executable missing.'
-            cd "$APP_PATH"
-            [[ -f artisan && -f vendor/autoload.php ]] || fail 'Artisan/dependencies missing; deploy application separately.'
-            [[ -w storage/logs ]] || fail 'Application account needs write access to storage/logs.'
-            command -v python3 >/dev/null || fail 'python3 is required for safe Supervisor config inspection.'
+            cd "$APP_PATH" || fail "Application directory missing"
 
-            inspect_program() {
-            as_root python3 - "$SUPERVISOR_CONFIG" "$SUPERVISOR_CONFIG_DIR" "$APP_PATH" "$PHP_BIN" "$APP_USER" "$QUEUE_PROGRAM" "$REVERB_PROGRAM" "${CONNECTION:-}" "${QUEUES:-}" "$1" "$2" <<'PYTHON'
-            import configparser, glob, os, shlex, sys
+            PHP_BIN="$(command -v "$PHP_BIN")" ||
+              fail "PHP executable not found"
 
-            root, target, app, php, user, queue, reverb, connection, queues, mode, selected = sys.argv[1:]
+            "$PHP_BIN" -r '
+              require "vendor/autoload.php";
+              $app = require "bootstrap/app.php";
+              $app->make(
+                Illuminate\Contracts\Console\Kernel::class
+              )->bootstrap();
 
-            def fail(message):
-                sys.exit('ERROR: ' + message)
-
-            def load(path):
-                p = configparser.ConfigParser(interpolation=None)
-                try:
-                    with open(path) as f:
-                        p.read_file(f)
-                except Exception:
-                    fail('Cannot safely parse Supervisor file: ' + path)
-                return p
-
-            main = load(root)
-            patterns = main.get('include', 'files', fallback='').replace('%(here)s', os.path.dirname(root)).split()
-            patterns = [p if os.path.isabs(p) else os.path.join(os.path.dirname(root), p) for p in patterns]
-            paths = {root} | {p for pattern in patterns for p in glob.glob(pattern)}
-
-            expected = {
-                queue: f'{php} {app}/artisan queue:work {connection} --queue={queues} --sleep=3 --tries=3 --backoff=5 --timeout=60 --memory=256 --no-interaction',
-                reverb: f'{php} {app}/artisan reverb:start --no-interaction',
-            }
-
-            found = {}
-            for path in sorted(paths):
-                p = load(path)
-                for section in p.sections():
-                    if not section.startswith('program:'):
-                        continue
-
-                    name = section.removeprefix('program:')
-                    c = p[section]
-                    command = c.get('command', '')
-
-                    if name not in expected:
-                        if (app in command or c.get('directory') == app) and ('queue:work' in command or 'reverb:start' in command):
-                            fail('Another application worker/Reverb program exists; reuse its configured name: ' + name)
-                        continue
-
-                    if selected != 'both' and name != selected:
-                        continue
-
-                    if name in found:
-                        fail('Duplicate program: ' + name)
-
-                    found[name] = path
-                    actual, wanted = shlex.split(command), shlex.split(expected[name])
-                    fixed = 4 if name == queue else 3
-
-                    if actual[:fixed] != wanted[:fixed] or sorted(actual[fixed:]) != sorted(wanted[fixed:]):
-                        fail('Existing command differs from reviewed policy; inspect manually, no overwrite: ' + name)
-
-                    if c.get('directory') != app or c.get('user') != user:
-                        fail('Existing program directory/account differs; no overwrite: ' + name)
-
-                    if c.get('autorestart', '').lower() != 'true' or c.get('autostart', '').lower() not in ['true', 'false']:
-                        fail('Program must declare autorestart=true and autostart: ' + name)
-
-                    if c.get('numprocs', '1') != '1' or int(c.get('stopwaitsecs', '0')) < 120:
-                        fail('Program needs numprocs=1 and stopwaitsecs>=120: ' + name)
-
-                    if c.get('stopsignal', 'TERM') != 'TERM' or not c.get('stdout_logfile'):
-                        fail('Program needs TERM and persistent stdout_logfile: ' + name)
-
-                    dormant = c.get('autostart').lower() == 'false'
-                    managed = path == os.path.join(target, name + '.conf') and open(path).read().startswith('; zmedix-staging-managed-v1\n')
-
-                    if mode == 'activate' and dormant:
-                        if not managed:
-                            fail('Existing autostart=false policy needs manual review; no overwrite: ' + name)
-
-                        import tempfile
-                        text = open(path).read().replace('autostart=false', 'autostart=true', 1)
-                        fd, temp = tempfile.mkstemp(dir=target)
-
-                        try:
-                            with os.fdopen(fd, 'w') as f:
-                                f.write(text)
-                            os.chmod(temp, 0o644)
-                            os.replace(temp, path)
-                        finally:
-                            if os.path.exists(temp):
-                                os.unlink(temp)
-
-                    if mode == 'register' and not dormant:
-                        fail('Unregistered autostart=true program would start during setup; register manually in an approved activation window.')
-
-                    print('Valid configuration: ' + name)
-
-            for name in expected:
-                if selected != 'both' and name != selected:
-                    continue
-
-                if name in found:
-                    continue
-
-                if mode != 'setup':
-                    fail('Missing program config; run staging-setup.yml with setup: ' + name)
-
-                if not any(glob.fnmatch.fnmatch(os.path.join(target, name + '.conf'), pattern) for pattern in patterns):
-                    fail('STAGING_SUPERVISOR_CONFIG_DIR is not included by the main Supervisor config.')
-
-                os.makedirs(target, mode=0o755, exist_ok=True)
-
-                text = f'''; zmedix-staging-managed-v1
-            [program:{name}]
-            directory={app}
-            command={expected[name]}
-            user={user}
-            numprocs=1
-            ; First explicit start enables boot autostart. Setup must never start services.
-            autostart=false
-            autorestart=true
-            startsecs=5
-            startretries=3
-            stopsignal=TERM
-            stopasgroup=true
-            killasgroup=true
-            stopwaitsecs=120
-            redirect_stderr=true
-            stdout_logfile={app}/storage/logs/{name}.log
-            stdout_logfile_maxbytes=20MB
-            stdout_logfile_backups=5
-            '''
-
-                try:
-                    with open(os.path.join(target, name + '.conf'), 'x') as f:
-                        f.write(text)
-                    os.chmod(os.path.join(target, name + '.conf'), 0o644)
-                except FileExistsError:
-                    fail('Refusing to overwrite existing file for: ' + name)
-
-                print('Created dormant program: ' + name)
-            PYTHON
-            }
-
-            settings=$("$PHP_BIN" <<'PHP'
-            <?php
-            try {
-                require 'vendor/autoload.php';
-                $app = require 'bootstrap/app.php';
-                $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-
-                $require = function (bool $valid, string $message): void {
-                    if (! $valid) {
-                        fwrite(STDERR, "ERROR: {$message}\n");
-                        exit(1);
-                    }
-                };
-
-                $require($app->environment('staging'), 'APP_ENV must be staging; refusing another environment.');
-                $require(filled(config('app.key')), 'Existing APP_KEY required; configure manually.');
-                $require(class_exists(Laravel\Reverb\ReverbServiceProvider::class), 'Reverb is not installed; install through a separately reviewed application change.');
-                $require(isset(Illuminate\Support\Facades\Artisan::all()['reverb:start']), 'Installed application does not register reverb:start.');
-                $require(config('broadcasting.default') === 'reverb', 'Set BROADCAST_CONNECTION=reverb manually before service setup.');
-                $require(config('reverb.default') === 'reverb', 'Configured Reverb server is not supported by this workflow.');
-
-                $host = config('reverb.servers.reverb.host');
-                $port = filter_var(config('reverb.servers.reverb.port'), FILTER_VALIDATE_INT);
-
-                $require(in_array($host, ['127.0.0.1', '::1', 'localhost'], true), 'Configure loopback REVERB_SERVER_HOST manually; public bindings refused.');
-                $require($port !== false && $port > 0 && $port <= 65535, 'Invalid configured REVERB_SERVER_PORT.');
-
-                foreach (['app_id', 'key', 'secret'] as $key) {
-                    $require(filled(config("reverb.apps.apps.0.{$key}")), 'Reverb app ID/key/secret must already be configured.');
-                }
-
-                $require(filled(config('reverb.apps.apps.0.options.host')), 'Public REVERB_HOST must already be configured.');
-                $require(config('reverb.apps.apps.0.options.scheme') === 'https', 'Configure REVERB_SCHEME=https and TLS proxy manually.');
-
-                $origins = config('reverb.apps.apps.0.allowed_origins', []);
-                $require(count($origins) > 0 && ! in_array('*', $origins, true), 'Configure explicit REVERB_ALLOWED_ORIGINS manually.');
-
-                echo $host."\n".$port."\n";
-            } catch (Throwable) {
-                fwrite(STDERR, "ERROR: Cannot bootstrap Laravel configuration; inspect application logs privately.\n");
+              if (! $app->environment("staging")) {
+                fwrite(STDERR, "APP_ENV must be staging\n");
                 exit(1);
+              }
+
+              if (! class_exists(
+                Laravel\Reverb\ReverbServiceProvider::class
+              )) {
+                fwrite(STDERR, "Laravel Reverb missing\n");
+                exit(1);
+              }
+            '
+
+            command -v supervisorctl >/dev/null ||
+              fail "Run Staging Setup first"
+
+            PROGRAM="zmedix-reverb"
+
+            get_status() {
+              root supervisorctl status "$PROGRAM" 2>&1 || true
             }
-            PHP
+
+            validate_settings() {
+              [[ "$REVERB_PORT" =~ ^[0-9]+$ ]] ||
+                fail "Invalid Reverb port"
+
+              (( REVERB_PORT >= 1 && REVERB_PORT <= 65535 )) ||
+                fail "Invalid Reverb port"
+
+              [[ "$WS_HOST" =~ ^[a-zA-Z0-9.-]+$ ]] ||
+                fail "Set STAGING_WS_HOST to the HTTPS hostname"
+
+              [[ -n "$WS_ORIGINS" ]] ||
+                fail "Set STAGING_REVERB_ORIGINS"
+
+              [[ "$WS_ORIGINS" =~ ^[a-zA-Z0-9.,:-]+$ ]] ||
+                fail "Use comma-separated origin hostnames only"
+
+              [[ "$WS_ORIGINS" != *"*"* ]] ||
+                fail "Wildcard origins are not allowed"
+            }
+
+            configure_env() {
+              echo "Backing up and configuring .env"
+
+              python3 - "$REVERB_PORT" "$WS_ORIGINS" <<'PYTHON'
+            import os
+            import pathlib
+            import secrets
+            import shutil
+            import sys
+            import tempfile
+            from datetime import datetime, timezone
+
+            port, origins = sys.argv[1:]
+            path = pathlib.Path(".env")
+
+            if not path.is_file():
+                sys.exit("ERROR: .env not found")
+
+            original = path.read_text()
+            stat = path.stat()
+
+            values = {}
+            lines = original.splitlines()
+
+            for line in lines:
+                if "=" in line and not line.lstrip().startswith("#"):
+                    key, value = line.split("=", 1)
+                    values[key.strip()] = value.strip().strip("\"'")
+
+            def credential(name, generator):
+                return values.get(name) or generator()
+
+            app_id = credential(
+                "REVERB_APP_ID",
+                lambda: str(secrets.randbelow(90000000) + 10000000)
+            )
+            app_key = credential(
+                "REVERB_APP_KEY",
+                lambda: secrets.token_hex(16)
+            )
+            app_secret = credential(
+                "REVERB_APP_SECRET",
+                lambda: secrets.token_hex(32)
             )
 
-            { IFS= read -r REVERB_HOST; IFS= read -r REVERB_PORT; } <<< "$settings"
+            updates = {
+                "BROADCAST_CONNECTION": "reverb",
+                "REVERB_APP_ID": app_id,
+                "REVERB_APP_KEY": app_key,
+                "REVERB_APP_SECRET": app_secret,
+                "REVERB_SERVER_HOST": "127.0.0.1",
+                "REVERB_SERVER_PORT": port,
+                "REVERB_HOST": "127.0.0.1",
+                "REVERB_PORT": port,
+                "REVERB_SCHEME": "http",
+                "REVERB_ALLOWED_ORIGINS": origins,
+            }
 
-            KIND=reverb
-            PROGRAM=$REVERB_PROGRAM
+            existing = set()
+            result = []
 
-            command -v supervisorctl >/dev/null || fail 'Supervisor missing; run staging-setup.yml.'
+            for line in lines:
+                if "=" in line and not line.lstrip().startswith("#"):
+                    key = line.split("=", 1)[0].strip()
 
-            all_status=$(as_root supervisorctl -c "$SUPERVISOR_CONFIG" status) || [[ $? == 3 ]] || fail 'Cannot query Supervisor; inspect daemon/socket permissions.'
-            status=$(awk -v name="$PROGRAM" '$1 == name' <<< "$all_status")
+                    if key in updates:
+                        if key not in existing:
+                            result.append(f"{key}={updates[key]}")
+                            existing.add(key)
+                        continue
 
-            [[ -n "$status" ]] || fail 'Program missing; run staging-setup.yml with setup.'
-            inspect_program check "$PROGRAM"
+                result.append(line)
+
+            for key, value in updates.items():
+                if key not in existing:
+                    result.append(f"{key}={value}")
+
+            backup = pathlib.Path(
+                ".env.reverb-backup-" +
+                datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+            )
+
+            shutil.copy2(path, backup)
+            os.chmod(backup, 0o600)
+
+            fd, temp = tempfile.mkstemp(
+                prefix=".env.reverb-",
+                dir="."
+            )
+
+            try:
+                with os.fdopen(fd, "w") as handle:
+                    handle.write("\n".join(result) + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+
+                os.chmod(temp, stat.st_mode & 0o777)
+                os.chown(temp, stat.st_uid, stat.st_gid)
+                os.replace(temp, path)
+            finally:
+                if os.path.exists(temp):
+                    os.unlink(temp)
+
+            print("Reverb .env updated; protected backup created")
+            PYTHON
+
+              "$PHP_BIN" artisan optimize:clear
+            }
+
+            validate_reverb_config() {
+              "$PHP_BIN" -r '
+                require "vendor/autoload.php";
+                $app = require "bootstrap/app.php";
+                $app->make(
+                  Illuminate\Contracts\Console\Kernel::class
+                )->bootstrap();
+
+                if (config("broadcasting.default") !== "reverb") {
+                  fwrite(STDERR, "Broadcast driver is not reverb\n");
+                  exit(1);
+                }
+
+                foreach (["app_id", "key", "secret"] as $field) {
+                  if (! filled(
+                    config("reverb.apps.apps.0.{$field}")
+                  )) {
+                    fwrite(STDERR, "Missing Reverb credentials\n");
+                    exit(1);
+                  }
+                }
+
+                if (config("reverb.servers.reverb.host") !== "127.0.0.1") {
+                  fwrite(STDERR, "Invalid Reverb bind host\n");
+                  exit(1);
+                }
+              '
+            }
+
+            configure_nginx() {
+              [[ -n "$NGINX_SITE" ]] ||
+                fail "Set STAGING_NGINX_SITE"
+
+              [[ "$NGINX_SITE" == /etc/nginx/* ]] ||
+                fail "NGINX_SITE must be under /etc/nginx"
+
+              root test -f "$NGINX_SITE" ||
+                fail "Nginx site file missing"
+
+              command -v nginx >/dev/null ||
+                fail "Nginx not installed"
+
+              root mkdir -p /etc/nginx/snippets
+
+              SNIPPET="/etc/nginx/snippets/zmedix-reverb.conf"
+
+              if root test -e "$SNIPPET"; then
+                root grep -q 'zmedix-managed-reverb-v1' "$SNIPPET" ||
+                  fail "Existing Reverb snippet is not managed by this workflow"
+              fi
+
+              root tee "$SNIPPET" >/dev/null <<EOF
+            # zmedix-managed-reverb-v1
+            location ^~ /app/ {
+                proxy_pass http://127.0.0.1:${REVERB_PORT};
+                proxy_http_version 1.1;
+                proxy_set_header Host \$host;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto \$scheme;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_read_timeout 3600s;
+                proxy_send_timeout 3600s;
+            }
+
+            location ^~ /apps/ {
+                proxy_pass http://127.0.0.1:${REVERB_PORT};
+                proxy_http_version 1.1;
+                proxy_set_header Host \$host;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto \$scheme;
+                proxy_read_timeout 60s;
+            }
+            EOF
+
+              root python3 - "$NGINX_SITE" "$WS_HOST" "$SNIPPET" <<'PYTHON'
+            import pathlib
+            import re
+            import shutil
+            import sys
+            from datetime import datetime, timezone
+
+            site = pathlib.Path(sys.argv[1])
+            domain = sys.argv[2]
+            snippet = sys.argv[3]
+            include = f"include {snippet};"
+
+            original = site.read_text()
+
+            if include in original:
+                print("Nginx Reverb include already exists")
+                sys.exit(0)
+
+            lines = original.splitlines(keepends=True)
+            depth = 0
+            in_server = False
+            start = 0
+            matches = []
+
+            for index, line in enumerate(lines):
+                clean = line.split("#", 1)[0]
+
+                if depth == 0 and re.match(
+                    r"^\s*server\s*\{", clean
+                ):
+                    in_server = True
+                    start = index
+
+                depth += clean.count("{") - clean.count("}")
+
+                if in_server and depth == 0:
+                    block = "".join(lines[start:index + 1])
+
+                    names = re.findall(
+                        r"server_name\s+([^;]+);", block
+                    )
+
+                    host_match = any(
+                        domain in group.split()
+                        for group in names
+                    )
+
+                    tls = bool(re.search(
+                        r"listen\s+[^;]*\b443\b", block
+                    ))
+
+                    if host_match and tls:
+                        if re.search(
+                            r"location\s+(?:\^~\s*)?/apps?/",
+                            block
+                        ):
+                            sys.exit(
+                                "ERROR: Existing WebSocket locations need manual review"
+                            )
+
+                        matches.append(index)
+
+                    in_server = False
+
+            if len(matches) != 1:
+                sys.exit(
+                    "ERROR: Expected exactly one matching HTTPS "
+                    "server block for the staging WebSocket host"
+                )
+
+            index = matches[0]
+
+            backup = pathlib.Path(
+                str(site) + ".zmedix-backup-" +
+                datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+            )
+
+            shutil.copy2(site, backup)
+
+            lines.insert(
+                index,
+                "    " + include + "\n"
+            )
+
+            site.write_text("".join(lines))
+            print(f"Nginx site backup: {backup}")
+            PYTHON
+
+              if ! root nginx -t; then
+                echo "Nginx validation failed. Restore the site backup."
+                fail "Nginx configuration invalid; reload skipped"
+              fi
+
+              root systemctl reload nginx
+              echo "Nginx configuration reloaded"
+            }
+
+            start_reverb() {
+              STATUS="$(get_status)"
+
+              if [[ "$STATUS" == *RUNNING* ]]; then
+                root supervisorctl restart "$PROGRAM"
+              else
+                root supervisorctl start "$PROGRAM"
+              fi
+            }
+
+            check_local() {
+              "$PHP_BIN" -r '
+                $host = "127.0.0.1";
+                $port = (int) $argv[1];
+
+                $socket = @stream_socket_client(
+                  "tcp://{$host}:{$port}",
+                  $errno, $error, 5
+                );
+
+                if (! $socket) {
+                  fwrite(STDERR, "Reverb local port unavailable\n");
+                  exit(1);
+                }
+
+                fclose($socket);
+                echo "Reverb local port reachable\n";
+              ' "$REVERB_PORT"
+            }
+
+            print_frontend_and_verify() {
+              validate_reverb_config
+
+              KEY="$("$PHP_BIN" -r '
+                require "vendor/autoload.php";
+                $app = require "bootstrap/app.php";
+                $app->make(
+                  Illuminate\Contracts\Console\Kernel::class
+                )->bootstrap();
+
+                echo config("reverb.apps.apps.0.key");
+              ')"
+
+              echo "Verifying HTTPS WebSocket handshake"
+
+              CODE="$(curl --silent --show-error \
+                --http1.1 \
+                --max-time 15 \
+                --output /dev/null \
+                --write-out '%{http_code}' \
+                --header 'Connection: Upgrade' \
+                --header 'Upgrade: websocket' \
+                --header 'Sec-WebSocket-Version: 13' \
+                --header 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+                "https://${WS_HOST}/app/${KEY}?protocol=7&client=js&version=8.4.0")" ||
+                fail "Public WebSocket connection failed"
+
+              [[ "$CODE" == 101 ]] ||
+                fail "Public WSS handshake returned HTTP $CODE"
+
+              echo ""
+              echo "======================================"
+              echo "FRONTEND REVERB CONFIGURATION"
+              echo "======================================"
+              echo "REVERB_APP_KEY=$KEY"
+              echo "REVERB_HOST=$WS_HOST"
+              echo "REVERB_PORT=443"
+              echo "REVERB_SCHEME=https"
+              echo "BROADCAST_AUTH_PATH=/api/student/broadcasting/auth"
+              echo "PRIVATE_CHANNEL=student.ai.conversation.{conversationId}"
+              echo "WEBSOCKET_HANDSHAKE=101"
+              echo "======================================"
+              echo "Do not send REVERB_APP_SECRET to frontend"
+            }
+
+            echo "=== Z-MEDIX REVERB ==="
+            echo "Action: $ACTION"
+            echo "Server: $(hostname)"
 
             case "$ACTION" in
-                status)
-                    echo "$status"
-                    ;;
-                stop)
-                    if [[ "$status" == *' STOPPED '* || "$status" == *' EXITED '* || "$status" == *' FATAL '* ]]; then
-                        echo 'Program already stopped.'
-                    else
-                        # TERM plus 120 seconds grace; active chat jobs have a 60-second timeout.
-                        as_root supervisorctl -c "$SUPERVISOR_CONFIG" stop "$PROGRAM"
-                    fi
-                    ;;
-                start|restart)
-                    inspect_program activate "$PROGRAM"
+              configure-and-start)
+                validate_settings
+                configure_env
+                validate_reverb_config
+                configure_nginx
+                start_reverb
+                ;;
 
-                    if [[ "$ACTION" == restart && "$status" != *' STOPPED '* && "$status" != *' EXITED '* && "$status" != *' FATAL '* ]]; then
-                        as_root supervisorctl -c "$SUPERVISOR_CONFIG" stop "$PROGRAM"
-                    fi
+              restart)
+                validate_settings
+                start_reverb
+                ;;
 
-                    as_root supervisorctl -c "$SUPERVISOR_CONFIG" reread
+              status)
+                echo "$(get_status)"
+                ;;
 
-                    # Scoped update starts only this program if its dormant config changed.
-                    as_root supervisorctl -c "$SUPERVISOR_CONFIG" update "$PROGRAM"
+              stop)
+                STATUS="$(get_status)"
 
-                    current=$(as_root supervisorctl -c "$SUPERVISOR_CONFIG" status "$PROGRAM") || [[ $? == 3 ]]
+                if [[ "$STATUS" == *RUNNING* ]]; then
+                  root supervisorctl stop "$PROGRAM"
+                else
+                  echo "Reverb already stopped"
+                fi
+                ;;
 
-                    if [[ "$current" != *' RUNNING '* ]]; then
-                        as_root supervisorctl -c "$SUPERVISOR_CONFIG" start "$PROGRAM"
-                    fi
-
-                    current=$(as_root supervisorctl -c "$SUPERVISOR_CONFIG" status "$PROGRAM")
-                    [[ "$current" == *' RUNNING '* ]] || fail 'Program did not reach RUNNING state.'
-                    echo "$current"
-                    ;;
-                *)
-                    fail 'Unsupported action.'
-                    ;;
+              *)
+                fail "Invalid action"
+                ;;
             esac
 
-            if [[ "$ACTION" == status || "$ACTION" == start || "$ACTION" == restart ]]; then
-                "$PHP_BIN" -r '$host = $argv[1]; $port = $argv[2]; $address = str_contains($host, ":") ? "[{$host}]" : $host; $s = @stream_socket_client("tcp://{$address}:{$port}", $errno, $error, 3); if (!$s) {fwrite(STDERR, "Configured Reverb local port is not listening (expected if intentionally stopped).\n"); exit(1);} fclose($s); echo "Configured local Reverb port is listening.\n";' -- "$REVERB_HOST" "$REVERB_PORT"
+            STATUS="$(get_status)"
+            echo "Supervisor: $STATUS"
+
+            if [[ "$ACTION" == configure-and-start ||
+                  "$ACTION" == restart ||
+                  ( "$ACTION" == status && "$STATUS" == *RUNNING* ) ]]; then
+
+              [[ "$STATUS" == *RUNNING* ]] ||
+                fail "Reverb is not running"
+
+              validate_settings
+              check_local
+              print_frontend_and_verify
             fi
 
-            echo 'Requested operation completed successfully.'
+            echo "Reverb operation complete"
             REMOTE
