@@ -4,12 +4,14 @@ namespace Tests\Feature\Subscriptions;
 
 use App\Enums\BillingCycle;
 use App\Enums\SubscriptionRequestStatus;
+use App\Enums\SubscriptionRequestType;
 use App\Enums\SubscriptionStatus;
 use App\Filament\Resources\StudentSubscriptionResource\Pages\ListStudentSubscriptions;
 use App\Filament\Resources\StudentSubscriptionResource\Pages\ViewStudentSubscription;
 use App\Filament\Resources\StudentSubscriptionResource\RelationManagers\PeriodsRelationManager;
 use App\Filament\Resources\SubscriptionRequestResource;
 use App\Filament\Resources\SubscriptionRequestResource\Pages\ListSubscriptionRequests;
+use App\Filament\Resources\SubscriptionRequestResource\Pages\ViewSubscriptionRequest;
 use App\Models\Plan;
 use App\Models\StudentSubscription;
 use App\Models\SubscriptionPeriod;
@@ -43,6 +45,22 @@ class SubscriptionAdminTest extends SubscriptionTestCase
     }
 
     // ─── The inbox ──────────────────────────────────────────────────────────
+
+    public function test_request_types_are_visible_and_filterable_in_the_admin(): void
+    {
+        $new = SubscriptionRequest::factory()->create();
+        $renewal = SubscriptionRequest::factory()->create(['request_type' => SubscriptionRequestType::Renewal]);
+        $admin = $this->superAdmin();
+
+        Livewire::actingAs($admin, 'admin')->test(ListSubscriptionRequests::class)
+            ->assertTableColumnExists('request_type')
+            ->assertCanSeeTableRecords([$new, $renewal])
+            ->filterTable('request_type', 'renewal')
+            ->assertCanSeeTableRecords([$renewal])->assertCanNotSeeTableRecords([$new]);
+
+        Livewire::actingAs($admin, 'admin')->test(ViewSubscriptionRequest::class, ['record' => $renewal->id])
+            ->assertOk()->assertSee('Renewal');
+    }
 
     public function test_the_inbox_lists_pending_requests_first_by_default(): void
     {

@@ -81,7 +81,7 @@ class WebsiteContentTest extends TestCase
         $component = Livewire::actingAs($this->superAdmin(), 'admin')
             ->test(WebsiteContentPage::class);
 
-        $this->assertCount(8, $component->instance()->getCards());
+        $this->assertCount(9, $component->instance()->getCards());
     }
 
     public function test_website_content_page_has_no_create_or_add_page_button(): void

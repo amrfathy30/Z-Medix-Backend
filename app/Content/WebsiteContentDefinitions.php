@@ -37,6 +37,7 @@ class WebsiteContentDefinitions
             self::services(),
             self::privacyPolicy(),
             self::termsAndConditions(),
+            self::subscriptionPolicy(),
             self::contactUs(),
         ];
     }
@@ -432,6 +433,16 @@ class WebsiteContentDefinitions
                     'en' => 'Default placeholder meta description for the Privacy Policy page.',
                     'ar' => 'وصف ميتا افتراضي مؤقت لصفحة سياسة الخصوصية.',
                 ],
+            ]),
+        ]);
+    }
+
+    private static function subscriptionPolicy(): PageContentDefinition
+    {
+        return PageContentDefinition::make('subscription-policy', 'Subscription Policy', 'سياسة الاشتراك', [
+            self::staticContentSection([
+                'title' => ['en' => 'Subscription Policy', 'ar' => 'سياسة الاشتراك'],
+                'body' => ['en' => '', 'ar' => ''],
             ]),
         ]);
     }
