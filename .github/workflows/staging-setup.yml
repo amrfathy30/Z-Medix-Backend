@@ -74,8 +74,8 @@ jobs:
                 Illuminate\Contracts\Console\Kernel::class
               )->bootstrap();
 
-              if (! $app->environment("staging")) {
-                fwrite(STDERR, "APP_ENV must be staging\n");
+              if (! $app->environment("local")) {
+                fwrite(STDERR, "APP_ENV must be local\n");
                 exit(1);
               }
 
