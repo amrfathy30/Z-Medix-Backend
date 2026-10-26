@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Content\WebsiteContentDefinitions;
+use App\Contracts\AiChatAgentInterface;
 use App\Contracts\Fellowship\SpreadsheetReader;
 use App\Contracts\PhoneVerificationProviderInterface;
 use App\Models\Admin;
@@ -60,6 +61,8 @@ use App\Policies\StudentSubscriptionPolicy;
 use App\Policies\SubjectPolicy;
 use App\Policies\SubscriptionPeriodPolicy;
 use App\Policies\SubscriptionRequestPolicy;
+use App\Services\AiChat\MockAgentAdapter;
+use App\Services\AiChat\UnavailableAgentAdapter;
 use App\Services\Fellowship\ExcelSpreadsheetReader;
 use App\Services\Learning\BookPdfPageCountService;
 use App\Services\Phone\Providers\LogPhoneVerificationProvider;
@@ -67,9 +70,12 @@ use App\Services\Phone\Providers\TwilioVerifyProvider;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Spatie\MediaLibrary\MediaCollections\Events\MediaHasBeenAddedEvent;
@@ -82,6 +88,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(AiChatAgentInterface::class, function () {
+            return config('ai_chat.adapter') === 'mock' && app()->environment('local', 'testing')
+                ? new MockAgentAdapter
+                : new UnavailableAgentAdapter;
+        });
+
         $this->app->bind(PhoneVerificationProviderInterface::class, function () {
             $provider = config('phone.default_provider', 'twilio_verify');
 
@@ -114,6 +126,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('ai-chat', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?? $request->ip()));
+        RateLimiter::for('ai-chat-messages', fn (Request $request) => Limit::perMinute(20)->by($request->user()?->id ?? $request->ip()));
+
         Event::listen(MediaHasBeenAddedEvent::class, [BookPdfPageCountService::class, 'added']);
         Media::deleted(fn (Media $media) => app(BookPdfPageCountService::class)->deleted($media));
 

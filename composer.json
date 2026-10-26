@@ -16,6 +16,7 @@
         "laravel/cashier": "^16.5",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.47",
+        "laravel/reverb": "^1.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "maatwebsite/excel": "^3.1",

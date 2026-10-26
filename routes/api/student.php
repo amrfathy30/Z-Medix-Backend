@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\FcmTokenController;
 use App\Http\Controllers\Api\FcmTopicController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\Student\AiConversationController;
+use App\Http\Controllers\Api\Student\AiMessageController;
 use App\Http\Controllers\Api\Student\BookController;
 use App\Http\Controllers\Api\Student\BookmarkController;
 use App\Http\Controllers\Api\Student\BookPageController;
@@ -60,7 +62,7 @@ Route::get('subscription-requests', [SubscriptionRequestController::class, 'inde
 //   case_report   -> Case Report
 //   library       -> study content and the student's own private books
 //   question_bank -> Fellowships
-//   ai            -> no routes yet; the AI module's routes will use feature:ai
+//   ai            -> student AI conversations
 
 Route::get('report-cases', [ReportCaseController::class, 'index'])
     ->middleware('feature:case_report')
@@ -203,3 +205,11 @@ Route::get('notifications', [NotificationController::class, 'index'])->name('not
 Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
 Route::patch('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 Route::patch('notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+
+Route::prefix('ai')->middleware(['feature:ai', 'throttle:ai-chat'])->name('ai.')->group(function (): void {
+    Route::apiResource('conversations', AiConversationController::class)->except('update');
+    Route::patch('conversations/{conversation}', [AiConversationController::class, 'update'])->name('conversations.update');
+    Route::get('conversations/{conversation}/messages', [AiMessageController::class, 'index'])->name('messages.index');
+    Route::post('conversations/{conversation}/messages', [AiMessageController::class, 'store'])->middleware('throttle:ai-chat-messages')->name('messages.store');
+    Route::get('messages/{message}', [AiMessageController::class, 'show'])->name('messages.show');
+});
