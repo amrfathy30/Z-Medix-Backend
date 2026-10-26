@@ -30,7 +30,7 @@ class SubscriptionPolicyTest extends TestCase
             Permission::findOrCreate($permission, 'admin');
         }
         $admin = Admin::factory()->create(['status' => AccountStatus::Active, 'type' => AdminType::Admin]);
-        $admin->givePermissionTo($canEdit ? ['content.view', 'content.update', 'content.publish'] : ['content.view']);
+        $admin->givePermissionTo($canEdit ? ['content.view', 'content.update'] : ['content.view']);
 
         return $admin;
     }
@@ -51,6 +51,110 @@ class SubscriptionPolicyTest extends TestCase
             ->assertJsonPath('data.content', $html);
         $this->getJson('/api/public/pages/subscription-policy?lang=ar')->assertOk()
             ->assertJsonPath('data.content', '<p>سياسة الاشتراك</p>');
+    }
+
+    public function test_saving_draft_policy_automatically_publishes_translated_html_and_subsequent_updates(): void
+    {
+        $section = $this->section();
+        $admin = $this->admin(true);
+        $html = '<h2>Saved policy</h2><p><strong>Payment terms</strong></p>';
+        $arabic = '<p>شروط الاشتراك</p>';
+
+        $this->assertSame(ContentStatus::Draft, $section->status);
+        $this->assertFalse($admin->hasPermissionTo('content.publish'));
+        $this->getJson('/api/public/pages/subscription-policy')->assertOk()
+            ->assertJsonPath('data.content', null)->assertJsonCount(0, 'data.sections');
+
+        $editor = Livewire::actingAs($admin, 'admin')
+            ->test(EditPageSection::class, ['record' => $section->id])
+            ->assertActionDoesNotExist('publish')
+            ->fillForm([
+                'data.body.en' => $html,
+                'data.body.ar' => $arabic,
+            ])->call('save')->assertHasNoFormErrors()->assertNotified();
+
+        $this->assertSame(ContentStatus::Published, $section->refresh()->status);
+        $this->assertSame($admin->id, $section->updated_by_admin_id);
+        $this->assertSame($html, $section->data['body']['en']);
+        $this->assertSame($arabic, $section->data['body']['ar']);
+        $this->getJson('/api/public/pages/subscription-policy')->assertOk()
+            ->assertJsonPath('data.content', $html)->assertJsonPath('data.sections.0.body', $html);
+        $this->getJson('/api/public/pages/subscription-policy?lang=ar')->assertOk()
+            ->assertJsonPath('data.content', $arabic);
+
+        $updatedHtml = '<h2>Updated policy</h2><p><em>Latest terms</em></p>';
+        $editor->fillForm(['data.body.en' => $updatedHtml])
+            ->call('save')->assertHasNoFormErrors();
+
+        $this->assertSame(ContentStatus::Published, $section->refresh()->status);
+        $this->assertSame($updatedHtml, $section->data['body']['en']);
+        $this->assertSame($arabic, $section->data['body']['ar']);
+        $this->getJson('/api/public/pages/subscription-policy')->assertOk()
+            ->assertJsonPath('data.content', $updatedHtml)->assertJsonPath('data.sections.0.body', $updatedHtml);
+        $this->getJson('/api/public/pages/subscription-policy?lang=ar')->assertOk()
+            ->assertJsonPath('data.content', $arabic);
+    }
+
+    public function test_resaving_existing_unpublished_policy_preserves_its_html_and_publishes_it(): void
+    {
+        $section = $this->section();
+        $data = $section->data;
+        $data['body'] = ['en' => '<p><strong>Existing terms</strong></p>', 'ar' => '<p>الشروط الحالية</p>'];
+
+        foreach ([ContentStatus::Draft, ContentStatus::Archived] as $status) {
+            $section->update(['data' => $data, 'status' => $status]);
+
+            Livewire::actingAs($this->admin(true), 'admin')
+                ->test(EditPageSection::class, ['record' => $section->id])
+                ->call('save')->assertHasNoFormErrors();
+
+            $this->assertSame(ContentStatus::Published, $section->refresh()->status);
+            $this->assertSame($data['body'], $section->data['body']);
+            $this->getJson('/api/public/pages/subscription-policy')->assertOk()
+                ->assertJsonPath('data.content', $data['body']['en']);
+            $this->getJson('/api/public/pages/subscription-policy?lang=ar')->assertOk()
+                ->assertJsonPath('data.content', $data['body']['ar']);
+        }
+    }
+
+    public function test_revoking_edit_permission_prevents_saving_and_publication(): void
+    {
+        $section = $this->section();
+        $admin = $this->admin(true);
+        $editor = Livewire::actingAs($admin, 'admin')
+            ->test(EditPageSection::class, ['record' => $section->id])
+            ->fillForm(['data.body.en' => '<p>Unauthorized terms</p>']);
+
+        $admin->revokePermissionTo('content.update');
+        $editor->call('save')->assertForbidden();
+
+        $this->assertSame(ContentStatus::Draft, $section->refresh()->status);
+        $this->assertSame('', $section->data['body']['en']);
+    }
+
+    public function test_saving_other_legal_pages_preserves_their_publication_status(): void
+    {
+        $admin = $this->admin(true);
+
+        foreach (['privacy-policy', 'terms-and-conditions'] as $key) {
+            $page = Page::factory()->create(['key' => $key, 'status' => ContentStatus::Published]);
+            $section = PageSection::factory()->create([
+                'page_id' => $page->id,
+                'section_key' => 'content',
+                'status' => ContentStatus::Draft,
+            ]);
+
+            foreach ([ContentStatus::Draft, ContentStatus::Archived] as $status) {
+                $section->update(['status' => $status]);
+                Livewire::actingAs($admin, 'admin')->test(EditPageSection::class, ['record' => $section->id])
+                    ->fillForm(['data.body.en' => '<p>Updated terms</p>'])
+                    ->call('save')->assertHasNoFormErrors();
+
+                $this->assertSame($status, $section->refresh()->status);
+                $this->assertSame('<p>Updated terms</p>', $section->data['body']['en']);
+                $this->getJson('/api/public/pages/'.$key)->assertOk()->assertJsonPath('data.content', null);
+            }
+        }
     }
 
     public function test_policy_is_available_in_website_content_next_to_existing_legal_pages(): void
@@ -100,5 +204,6 @@ class SubscriptionPolicyTest extends TestCase
         $section = $this->section();
         Livewire::actingAs($this->admin(false), 'admin')->test(EditPageSection::class, ['record' => $section->id])->assertForbidden();
         $this->assertSame('', $section->refresh()->data['body']['en']);
+        $this->assertSame(ContentStatus::Draft, $section->status);
     }
 }

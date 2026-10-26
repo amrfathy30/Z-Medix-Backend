@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PageSectionResource\Pages;
 
+use App\Enums\ContentStatus;
 use App\Filament\Pages\WebsiteContentPage;
 use App\Filament\Resources\PageSectionResource;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
@@ -39,6 +40,10 @@ class EditPageSection extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $data['updated_by_admin_id'] = auth('admin')->id();
+
+        if ($this->record->page?->key === 'subscription-policy' && $this->record->section_key === 'content') {
+            $data['status'] = ContentStatus::Published;
+        }
 
         return $data;
     }
