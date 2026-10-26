@@ -43,8 +43,9 @@ class PageSectionResource extends Resource
     /**
      * This resource is content-editing only, never a page/section builder.
      * Which sections exist, on which page, with which order/visibility,
-     * is fixed by seeders and WebsiteContentDefinitions — never by an
-     * admin action. No role, including super_admin, can create, delete,
+     * is fixed by seeders and WebsiteContentDefinitions. Subscription Policy
+     * content alone is automatically published when saved.
+     * No role, including super_admin, can create, delete,
      * force-delete, or restore a PageSection from the dashboard.
      */
     public static function canCreate(): bool
@@ -105,10 +106,10 @@ class PageSectionResource extends Resource
     /**
      * Content-editing only: page_id, section_key, status, and sort_order are
      * never rendered, in any form, for any role. They are structural/design
-     * settings controlled exclusively by seeders and
-     * WebsiteContentDefinitions. Omitting these fields from the schema
-     * means Filament's getState() never includes them, so saving content
-     * never touches — and therefore never changes — their existing DB values.
+     * settings controlled by seeders and WebsiteContentDefinitions, except
+     * Subscription Policy content being automatically published on save.
+     * Omitting these fields from the schema means Filament's getState() never
+     * includes them; all other structural values are preserved when saving.
      *
      * The schema itself is generated from the exact page key + section_key
      * definition via ContentDefinitionRegistry — there is no fallback by
