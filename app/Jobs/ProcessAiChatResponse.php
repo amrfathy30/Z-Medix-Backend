@@ -64,11 +64,13 @@ class ProcessAiChatResponse implements ShouldQueue
         }
 
         try {
-            $question = $message->replyTo()->first();
+            $question = $message->replyTo()->with('attachments')->first();
             if ($question === null) {
                 return;
             }
-            $response = $agent->generateResponse(new AgentChatRequest($message->conversation_id, $question->id, $question->content, $message->correlation_id));
+            $response = $agent->generateResponse(new AgentChatRequest($message->conversation_id, $question->id, $question->content, $message->correlation_id, $question->attachments->map(fn ($attachment): array => [
+                'reference_type' => $attachment->reference_type, 'reference_id' => $attachment->reference_id, 'snapshot' => $attachment->snapshot,
+            ])->all()));
             if (trim($response->content) === '' || strlen($response->content) > config('ai_chat.max_response_bytes') || $response->correlationId !== $message->correlation_id) {
                 throw new RuntimeException('Invalid agent response.');
             }

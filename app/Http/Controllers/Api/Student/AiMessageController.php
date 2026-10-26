@@ -20,14 +20,14 @@ class AiMessageController extends Controller
     public function index(Request $request, string $conversation): JsonResponse
     {
         $record = $this->chat->ownedConversation($request->user(), $conversation);
-        $messages = $record->messages()->orderByDesc('id')->paginate(min(max($request->integer('per_page', 50), 1), 100));
+        $messages = $record->messages()->with('attachments')->orderByDesc('id')->paginate(min(max($request->integer('per_page', 50), 1), 100));
 
         return $this->paginatedResponse(AiMessageResource::collection($messages));
     }
 
     public function store(StoreAiMessageRequest $request, string $conversation): JsonResponse
     {
-        $result = $this->chat->submit($request->user(), $conversation, $request->validated('content'), $request->validated('client_message_id'));
+        $result = $this->chat->submit($request->user(), $conversation, $request->validated('content'), $request->validated('client_message_id'), $request->validated('attachments', []));
         $data = ['user_message' => new AiMessageResource($result['user_message']), 'assistant_message' => new AiMessageResource($result['assistant_message'])];
         if (! $result['scheduled']) {
             return response()->json(['success' => false, 'message' => 'Chat processing could not be scheduled.', 'code' => 'SCHEDULING_FAILED', 'data' => $data, 'errors' => []], 503);
@@ -38,7 +38,7 @@ class AiMessageController extends Controller
 
     public function show(Request $request, string $message): JsonResponse
     {
-        $record = AiMessage::query()->whereHas('conversation', fn ($query) => $query->where('user_id', $request->user()->id))->findOrFail($message);
+        $record = AiMessage::query()->with('attachments')->whereHas('conversation', fn ($query) => $query->where('user_id', $request->user()->id))->findOrFail($message);
 
         return $this->successResponse(new AiMessageResource($record));
     }

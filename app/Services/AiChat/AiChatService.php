@@ -16,32 +16,38 @@ use Throwable;
 
 class AiChatService
 {
-    public function __construct(private ChatBroadcaster $broadcasts, private Dispatcher $bus) {}
+    public function __construct(private ChatBroadcaster $broadcasts, private Dispatcher $bus, private AttachmentResolver $attachments) {}
 
     public function ownedConversation(User $student, string $id): AiConversation
     {
         return AiConversation::query()->where('user_id', $student->id)->findOrFail($id);
     }
 
-    /** @return array{user_message: AiMessage, assistant_message: AiMessage, created: bool, scheduled: bool} */
-    public function submit(User $student, string $conversationId, string $content, string $clientMessageId): array
+    /**
+     * @param  array<int, array{type: string, id: int}>  $attachments
+     * @return array{user_message: AiMessage, assistant_message: AiMessage, created: bool, scheduled: bool}
+     */
+    public function submit(User $student, string $conversationId, string $content, string $clientMessageId, array $attachments = []): array
     {
-        $result = DB::transaction(function () use ($student, $conversationId, $content, $clientMessageId): array {
+        $result = DB::transaction(function () use ($student, $conversationId, $content, $clientMessageId, $attachments): array {
             $conversation = AiConversation::query()->where('user_id', $student->id)->lockForUpdate()->findOrFail($conversationId);
-            $existing = $conversation->messages()->where('client_message_id', $clientMessageId)->first();
+            $existing = $conversation->messages()->with('attachments')->where('client_message_id', $clientMessageId)->first();
             if ($existing !== null) {
-                if ($existing->content !== $content) {
-                    throw ValidationException::withMessages(['client_message_id' => 'This identifier was already used for different content.']);
+                if ($existing->content !== $content || $this->referenceKeys($attachments) !== $this->referenceKeys($existing->attachments->map(fn ($attachment): array => ['type' => $attachment->reference_type, 'id' => $attachment->reference_id])->all())) {
+                    throw ValidationException::withMessages(['client_message_id' => 'This identifier was already used for different content or attachments.']);
                 }
 
-                return ['user_message' => $existing, 'assistant_message' => $existing->response()->firstOrFail(), 'created' => false];
+                return ['user_message' => $existing, 'assistant_message' => $existing->response()->with('attachments')->firstOrFail(), 'created' => false];
             }
 
+            $resolved = $this->attachments->resolve($student, $attachments);
             $correlationId = (string) Str::uuid();
             $message = $conversation->messages()->create([
                 'role' => 'user', 'status' => 'completed', 'content' => $content,
                 'client_message_id' => $clientMessageId, 'correlation_id' => $correlationId,
             ]);
+            $message->attachments()->createMany($resolved);
+            $message->load('attachments');
             $reply = $conversation->messages()->create([
                 'role' => 'assistant', 'status' => 'pending', 'reply_to_message_id' => $message->id,
                 'correlation_id' => $correlationId,
@@ -64,6 +70,18 @@ class AiChatService
         }
 
         return [...$result, 'assistant_message' => $result['assistant_message']->refresh(), 'scheduled' => $scheduled];
+    }
+
+    /**
+     * @param  array<int, array{type: string, id: int}>  $references
+     * @return array<int, string>
+     */
+    private function referenceKeys(array $references): array
+    {
+        $keys = array_map(fn (array $reference): string => $reference['type'].':'.(int) $reference['id'], $references);
+        sort($keys);
+
+        return $keys;
     }
 
     public function schedule(int $messageId): void
