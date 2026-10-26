@@ -31,6 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/api/admin.php'));
         },
     )
+    ->withBroadcasting(
+        __DIR__.'/../routes/channels.php',
+        ['prefix' => 'api/student', 'middleware' => ['api', 'auth:sanctum', 'feature:ai', 'throttle:ai-chat']],
+    )
     ->withMiddleware(function (Middleware $middleware): void {
         // `feature:library` etc.: gates a student route behind a plan feature.
         $middleware->alias([

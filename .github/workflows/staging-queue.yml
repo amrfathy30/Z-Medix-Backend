@@ -1,0 +1,283 @@
+name: Staging Queue
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Manual service operation
+        type: choice
+        required: true
+        default: status
+        options:
+          - status
+          - start
+          - stop
+          - restart
+          - run-once
+
+permissions: {}
+
+concurrency:
+  group: zmedix-staging-services
+  cancel-in-progress: false
+
+# Set SERVER_* secrets in Environment staging, never to production values.
+env:
+  APP_PATH: ${{ vars.STAGING_APP_PATH }}
+  PHP_BIN: ${{ vars.STAGING_PHP_BIN || 'php' }}
+  APP_USER: ${{ secrets.SERVER_USER }}
+  SUPERVISOR_CONFIG: ${{ vars.STAGING_SUPERVISOR_CONFIG }}
+  SUPERVISOR_CONFIG_DIR: ${{ vars.STAGING_SUPERVISOR_CONFIG_DIR }}
+  SUPERVISOR_SERVICE: ${{ vars.STAGING_SUPERVISOR_SERVICE }}
+  QUEUE_PROGRAM: ${{ vars.STAGING_QUEUE_PROGRAM }}
+  REVERB_PROGRAM: ${{ vars.STAGING_REVERB_PROGRAM }}
+
+jobs:
+  manage:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 15
+    steps:
+      - name: Validate staging settings
+        env:
+          STAGING_BRANCH: ${{ vars.STAGING_BRANCH }}
+          SELECTED_BRANCH: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          SSH_HOST: ${{ secrets.SERVER_HOST }}
+          SSH_USER: ${{ secrets.SERVER_USER }}
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SSH_FINGERPRINT: ${{ secrets.STAGING_SSH_FINGERPRINT }}
+          SSH_PORT: ${{ vars.STAGING_SSH_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          : "${STAGING_BRANCH:?Set the same STAGING_BRANCH used by deploy.yml}"
+          [[ "$REF_TYPE" == branch && "$SELECTED_BRANCH" == "$STAGING_BRANCH" ]] || { echo 'Select the configured staging branch.' >&2; exit 1; }
+          [[ "$PHP_BIN" == php || "$PHP_BIN" =~ ^/[a-zA-Z0-9_./-]+$ ]] || { echo 'Invalid PHP executable.' >&2; exit 1; }
+          : "${SSH_HOST:?Set staging SERVER_HOST}" "${SSH_USER:?Set staging SERVER_USER}" "${SSH_KEY:?Set staging SERVER_SSH_KEY}"
+          : "${SSH_FINGERPRINT:?Set STAGING_SSH_FINGERPRINT}" "${SSH_PORT:?Set STAGING_SSH_PORT}"
+          for value in "$APP_PATH" "$SUPERVISOR_CONFIG" "$SUPERVISOR_CONFIG_DIR"; do
+              [[ "$value" =~ ^/[a-zA-Z0-9_./-]+$ ]] || { echo 'Set absolute paths without whitespace/metacharacters.' >&2; exit 1; }
+          done
+          [[ "$APP_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
+          [[ "$QUEUE_PROGRAM" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
+          [[ "$REVERB_PROGRAM" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
+          [[ "$QUEUE_PROGRAM" != "$REVERB_PROGRAM" ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
+          [[ "$SUPERVISOR_SERVICE" =~ ^[a-zA-Z0-9_.@-]+$ ]] || { echo 'Invalid staging user, program name or service unit.' >&2; exit 1; }
+          [[ "$SSH_PORT" =~ ^[0-9]+$ ]] && (( SSH_PORT >= 1 && SSH_PORT <= 65535 )) || { echo 'Invalid SSH port.' >&2; exit 1; }
+      - name: Manage staging service over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          ACTION: ${{ inputs.action }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_SSH_FINGERPRINT }}
+          port: ${{ vars.STAGING_SSH_PORT || 22 }}
+          timeout: 60s
+          command_timeout: 12m
+          envs: ACTION,APP_PATH,PHP_BIN,APP_USER,SUPERVISOR_CONFIG,SUPERVISOR_CONFIG_DIR,SUPERVISOR_SERVICE,QUEUE_PROGRAM,REVERB_PROGRAM
+          script: |
+            bash -se <<'REMOTE'
+            set -euo pipefail
+            fail() { echo "ERROR: $*" >&2; exit 1; }
+            # SSH access does not establish sudo rights. Check each exact command without executing it first.
+            as_root() {
+                command -v sudo >/dev/null || fail 'sudo is missing; administrator setup is required.'
+                sudo -n -l -- "$@" >/dev/null 2>&1 || fail "SERVER_USER lacks non-interactive sudo authorization for $1; ask the staging administrator to review sudo policy."
+                sudo -n -- "$@"
+            }
+            [[ "$(id -un)" == "$APP_USER" && "$(id -u)" != 0 ]] || fail 'SERVER_USER must be the existing restricted application account.'
+            PHP_BIN=$(command -v "$PHP_BIN") || fail 'Configured PHP executable is unavailable to SERVER_USER.'
+            [[ -d "$APP_PATH" && -x "$PHP_BIN" ]] || fail 'Configured project directory or PHP executable missing.'
+            cd "$APP_PATH"
+            [[ -f artisan && -f vendor/autoload.php ]] || fail 'Artisan/dependencies missing; deploy application separately.'
+            [[ -w storage/logs ]] || fail 'Application account needs write access to storage/logs.'
+            command -v python3 >/dev/null || fail 'python3 is required for safe Supervisor config inspection.'
+            inspect_program() {
+            as_root python3 - "$SUPERVISOR_CONFIG" "$SUPERVISOR_CONFIG_DIR" "$APP_PATH" "$PHP_BIN" "$APP_USER" "$QUEUE_PROGRAM" "$REVERB_PROGRAM" "${CONNECTION:-}" "${QUEUES:-}" "$1" "$2" <<'PYTHON'
+            import configparser, glob, os, shlex, sys
+            root, target, app, php, user, queue, reverb, connection, queues, mode, selected = sys.argv[1:]
+            def fail(message):
+                sys.exit('ERROR: ' + message)
+            def load(path):
+                p = configparser.ConfigParser(interpolation=None)
+                try:
+                    with open(path) as f:
+                        p.read_file(f)
+                except Exception:
+                    fail('Cannot safely parse Supervisor file: ' + path)
+                return p
+            main = load(root)
+            patterns = main.get('include', 'files', fallback='').replace('%(here)s', os.path.dirname(root)).split()
+            patterns = [p if os.path.isabs(p) else os.path.join(os.path.dirname(root), p) for p in patterns]
+            paths = {root} | {p for pattern in patterns for p in glob.glob(pattern)}
+            expected = {
+                queue: f'{php} {app}/artisan queue:work {connection} --queue={queues} --sleep=3 --tries=3 --backoff=5 --timeout=60 --memory=256 --no-interaction',
+                reverb: f'{php} {app}/artisan reverb:start --no-interaction',
+            }
+            found = {}
+            for path in sorted(paths):
+                p = load(path)
+                for section in p.sections():
+                    if not section.startswith('program:'):
+                        continue
+                    name = section.removeprefix('program:')
+                    c = p[section]
+                    command = c.get('command', '')
+                    if name not in expected:
+                        if (app in command or c.get('directory') == app) and ('queue:work' in command or 'reverb:start' in command):
+                            fail('Another application worker/Reverb program exists; reuse its configured name: ' + name)
+                        continue
+                    if selected != 'both' and name != selected:
+                        continue
+                    if name in found:
+                        fail('Duplicate program: ' + name)
+                    found[name] = path
+                    actual, wanted = shlex.split(command), shlex.split(expected[name])
+                    fixed = 4 if name == queue else 3
+                    if actual[:fixed] != wanted[:fixed] or sorted(actual[fixed:]) != sorted(wanted[fixed:]):
+                        fail('Existing command differs from reviewed policy; inspect manually, no overwrite: ' + name)
+                    if c.get('directory') != app or c.get('user') != user:
+                        fail('Existing program directory/account differs; no overwrite: ' + name)
+                    if c.get('autorestart', '').lower() != 'true' or c.get('autostart', '').lower() not in ['true', 'false']:
+                        fail('Program must declare autorestart=true and autostart: ' + name)
+                    if c.get('numprocs', '1') != '1' or int(c.get('stopwaitsecs', '0')) < 120:
+                        fail('Program needs numprocs=1 and stopwaitsecs>=120: ' + name)
+                    if c.get('stopsignal', 'TERM') != 'TERM' or not c.get('stdout_logfile'):
+                        fail('Program needs TERM and persistent stdout_logfile: ' + name)
+                    dormant = c.get('autostart').lower() == 'false'
+                    managed = path == os.path.join(target, name + '.conf') and open(path).read().startswith('; zmedix-staging-managed-v1\n')
+                    if mode == 'activate' and dormant:
+                        if not managed:
+                            fail('Existing autostart=false policy needs manual review; no overwrite: ' + name)
+                        # Only enable the dormant config created by this setup workflow.
+                        import tempfile
+                        text = open(path).read().replace('autostart=false', 'autostart=true', 1)
+                        fd, temp = tempfile.mkstemp(dir=target)
+                        try:
+                            with os.fdopen(fd, 'w') as f:
+                                f.write(text)
+                            os.chmod(temp, 0o644)
+                            os.replace(temp, path)
+                        finally:
+                            if os.path.exists(temp):
+                                os.unlink(temp)
+                    if mode == 'register' and not dormant:
+                        fail('Unregistered autostart=true program would start during setup; register manually in an approved activation window.')
+                    print('Valid configuration: ' + name)
+            for name in expected:
+                if selected != 'both' and name != selected:
+                    continue
+                if name in found:
+                    continue
+                if mode != 'setup':
+                    fail('Missing program config; run staging-setup.yml with setup: ' + name)
+                if not any(glob.fnmatch.fnmatch(os.path.join(target, name + '.conf'), pattern) for pattern in patterns):
+                    fail('STAGING_SUPERVISOR_CONFIG_DIR is not included by the main Supervisor config.')
+                os.makedirs(target, mode=0o755, exist_ok=True)
+                text = f'''; zmedix-staging-managed-v1
+            [program:{name}]
+            directory={app}
+            command={expected[name]}
+            user={user}
+            numprocs=1
+            ; First explicit start enables boot autostart. Setup must never start services.
+            autostart=false
+            autorestart=true
+            startsecs=5
+            startretries=3
+            stopsignal=TERM
+            stopasgroup=true
+            killasgroup=true
+            stopwaitsecs=120
+            redirect_stderr=true
+            stdout_logfile={app}/storage/logs/{name}.log
+            stdout_logfile_maxbytes=20MB
+            stdout_logfile_backups=5
+            '''
+                try:
+                    with open(os.path.join(target, name + '.conf'), 'x') as f:
+                        f.write(text)
+                    os.chmod(os.path.join(target, name + '.conf'), 0o644)
+                except FileExistsError:
+                    fail('Refusing to overwrite existing file for: ' + name)
+                print('Created dormant program: ' + name)
+            PYTHON
+            }
+            settings=$("$PHP_BIN" <<'PHP'
+            <?php
+            try {
+                require 'vendor/autoload.php';
+                $app = require 'bootstrap/app.php';
+                $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+                $require = function (bool $valid, string $message): void {
+                    if (! $valid) {
+                        fwrite(STDERR, "ERROR: {$message}\n");
+                        exit(1);
+                    }
+                };
+                $require($app->environment('staging'), 'APP_ENV must be staging; refusing another environment.');
+                $require(filled(config('app.key')), 'Existing APP_KEY required; configure manually.');
+                $connection = config('queue.default');
+                $require(is_string($connection) && preg_match('/^[a-zA-Z0-9_-]+$/', $connection) === 1, 'Invalid configured queue connection.');
+                $require(in_array(config("queue.connections.{$connection}.driver"), ['database', 'redis', 'beanstalkd'], true), 'Persistent database/redis/beanstalkd queue required; other drivers need a reviewed policy.');
+                $require(config('ai_chat.queue_connection') === $connection, 'Chat uses another connection; configure separate workers manually.');
+                $queues = array_unique([config("queue.connections.{$connection}.queue"), config('ai_chat.queue')]);
+                foreach ($queues as $queue) {
+                    $require(is_string($queue) && preg_match('/^[a-zA-Z0-9_.-]+$/', $queue) === 1, 'Explicit valid queue names are required.');
+                }
+                $require((int) config("queue.connections.{$connection}.retry_after") >= 90, 'Queue retry_after must be at least 90 seconds for the 60-second worker/job timeout.');
+                $require(extension_loaded('pcntl'), 'PHP pcntl required for graceful worker signals/timeouts.');
+                echo $connection."\n".implode(',', $queues)."\n";
+            } catch (Throwable) {
+                fwrite(STDERR, "ERROR: Cannot bootstrap Laravel configuration; inspect application logs privately.\n");
+                exit(1);
+            }
+            PHP
+            )
+            { IFS= read -r CONNECTION; IFS= read -r QUEUES; } <<< "$settings"
+            KIND=queue
+            PROGRAM=$QUEUE_PROGRAM
+            command -v supervisorctl >/dev/null || fail 'Supervisor missing; run staging-setup.yml.'
+            all_status=$(as_root supervisorctl -c "$SUPERVISOR_CONFIG" status) || [[ $? == 3 ]] || fail 'Cannot query Supervisor; inspect daemon/socket permissions.'
+            status=$(awk -v name="$PROGRAM" '$1 == name' <<< "$all_status")
+            [[ -n "$status" ]] || fail 'Program missing; run staging-setup.yml with setup.'
+            inspect_program check "$PROGRAM"
+            case "$ACTION" in
+                status) echo "$status" ;;
+                stop)
+                    if [[ "$status" == *' STOPPED '* || "$status" == *' EXITED '* || "$status" == *' FATAL '* ]]; then
+                        echo 'Program already stopped.'
+                    else
+                        # TERM plus 120 seconds grace; active chat jobs have a 60-second timeout.
+                        as_root supervisorctl -c "$SUPERVISOR_CONFIG" stop "$PROGRAM"
+                    fi
+                    ;;
+                start|restart)
+            inspect_program activate "$PROGRAM"
+                    if [[ "$ACTION" == restart && "$status" != *' STOPPED '* && "$status" != *' EXITED '* && "$status" != *' FATAL '* ]]; then
+                        as_root supervisorctl -c "$SUPERVISOR_CONFIG" stop "$PROGRAM"
+                    fi
+                    as_root supervisorctl -c "$SUPERVISOR_CONFIG" reread
+                    # Scoped update starts only this program if its dormant config changed.
+                    as_root supervisorctl -c "$SUPERVISOR_CONFIG" update "$PROGRAM"
+                    current=$(as_root supervisorctl -c "$SUPERVISOR_CONFIG" status "$PROGRAM") || [[ $? == 3 ]]
+                    if [[ "$current" != *' RUNNING '* ]]; then
+                        as_root supervisorctl -c "$SUPERVISOR_CONFIG" start "$PROGRAM"
+                    fi
+                    current=$(as_root supervisorctl -c "$SUPERVISOR_CONFIG" status "$PROGRAM")
+                    [[ "$current" == *' RUNNING '* ]] || fail 'Program did not reach RUNNING state.'
+                    echo "$current"
+                    ;;
+                run-once)
+                    [[ "$KIND" == queue ]] || fail 'run-once is queue only.'
+                    command -v timeout >/dev/null || fail 'GNU timeout is required for bounded run-once.'
+                    echo 'Processing at most one REAL queued job; persistent worker remains separately managed.'
+                    timeout --signal=TERM --kill-after=75s 120s "$PHP_BIN" artisan queue:work "$CONNECTION" \
+                        --queue="$QUEUES" --once --sleep=3 --tries=3 --backoff=5 --timeout=60 --memory=256 --no-interaction
+                    ;;
+                *) fail 'Unsupported action.' ;;
+            esac
+            echo 'Requested operation completed successfully.'
+            REMOTE
