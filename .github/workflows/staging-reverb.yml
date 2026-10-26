@@ -35,7 +35,7 @@ jobs:
           APP_PATH: ${{ vars.STAGING_APP_PATH || '/var/www/zmedix-backend' }}
           PHP_BIN: ${{ vars.STAGING_PHP_BIN || 'php' }}
           REVERB_PORT: ${{ vars.STAGING_REVERB_INTERNAL_PORT || '8081' }}
-          WS_HOST: ${{ vars.STAGING_WS_HOST }}
+          WS_HOST: zmedixapi.pulvent.com
           WS_ORIGINS: ${{ vars.STAGING_REVERB_ORIGINS }}
           NGINX_SITE: ${{ vars.STAGING_NGINX_SITE }}
         with:
