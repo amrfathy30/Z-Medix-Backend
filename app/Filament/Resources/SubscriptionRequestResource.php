@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\SubscriptionRequestStatus;
+use App\Enums\SubscriptionRequestType;
 use App\Exceptions\Subscription\SubscriptionException;
 use App\Filament\Resources\SubscriptionRequestResource\Pages\ListSubscriptionRequests;
 use App\Filament\Resources\SubscriptionRequestResource\Pages\ViewSubscriptionRequest;
@@ -100,6 +101,10 @@ class SubscriptionRequestResource extends Resource
                     ->label(__('admin.subscriptions.field_billing_cycle'))
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state->label()),
+                TextColumn::make('request_type')
+                    ->label(__('subscriptions.request_type'))
+                    ->badge()
+                    ->formatStateUsing(fn (SubscriptionRequestType $state): string => $state->label()),
                 TextColumn::make('status')
                     ->label(__('admin.subscriptions.field_status'))
                     ->badge()
@@ -128,6 +133,9 @@ class SubscriptionRequestResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                SelectFilter::make('request_type')->label(__('subscriptions.request_type'))
+                    ->options(collect(SubscriptionRequestType::cases())
+                        ->mapWithKeys(fn (SubscriptionRequestType $type): array => [$type->value => $type->label()])->all()),
                 SelectFilter::make('status')
                     ->label(__('admin.subscriptions.field_status'))
                     ->options(collect(SubscriptionRequestStatus::cases())
@@ -222,6 +230,8 @@ class SubscriptionRequestResource extends Resource
                 TextEntry::make('user.name')->label(__('admin.subscriptions.field_student')),
                 TextEntry::make('plan.name')->label(__('admin.subscriptions.field_plan')),
                 TextEntry::make('billing_cycle')->label(__('admin.subscriptions.field_billing_cycle')),
+                TextEntry::make('request_type')->label(__('subscriptions.request_type'))->badge()
+                    ->formatStateUsing(fn (SubscriptionRequestType $state): string => $state->label()),
                 TextEntry::make('status')->label(__('admin.subscriptions.field_status'))->badge(),
                 TextEntry::make('admin_note')->label(__('admin.subscription_requests.field_admin_note'))->placeholder('—'),
                 TextEntry::make('created_at')->label(__('admin.subscription_requests.field_requested_at'))->dateTime(),

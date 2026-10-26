@@ -4,6 +4,7 @@ namespace App\Services\Subscription;
 
 use App\Enums\BillingCycle;
 use App\Enums\SubscriptionRequestStatus;
+use App\Enums\SubscriptionRequestType;
 use App\Events\SubscriptionApproved;
 use App\Events\SubscriptionRejected;
 use App\Exceptions\Subscription\SubscriptionException;
@@ -48,11 +49,16 @@ class SubscriptionService
                 ->pending()->orderByDesc('id')->lockForUpdate()->first();
             $plan = Plan::withTrashed()->lockForUpdate()->findOrFail($plan->getKey());
             $this->promos->validatePlan($plan, $cycle);
+            $requestType = SubscriptionPeriod::query()
+                ->whereHas('subscription', fn ($query) => $query->where('user_id', $student->getKey()))
+                ->exists() ? SubscriptionRequestType::Renewal : SubscriptionRequestType::New;
             $code = filled($promoCode) ? PromoCode::normalize($promoCode) : null;
 
             if ($code === null && $pending !== null && $pending->plan_id === $plan->getKey()
                 && $pending->billing_cycle === $cycle && $pending->pricing_snapshot !== null
                 && ($pending->pricing_snapshot['code'] ?? null) === $code) {
+                $pending->forceFill(['request_type' => $requestType])->save();
+
                 return $pending;
             }
 
@@ -70,6 +76,7 @@ class SubscriptionService
                 'plan_id' => $plan->getKey(),
                 'billing_cycle' => $cycle,
                 'pricing_snapshot' => $pricing,
+                'request_type' => $requestType,
             ];
             if ($pending !== null) {
                 $pending->forceFill($attributes)->save();
@@ -172,6 +179,9 @@ class SubscriptionService
                 ])->save();
                 $this->transitionPromoUsage($request, 'consumed');
             }
+
+            SubscriptionRequest::query()->where('user_id', $payment->student->getKey())
+                ->pending()->update(['request_type' => SubscriptionRequestType::Renewal->value]);
 
             return $period;
         }, attempts: 5);

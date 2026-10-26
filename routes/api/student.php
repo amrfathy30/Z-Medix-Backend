@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\Student\QuizAnswerController;
 use App\Http\Controllers\Api\Student\QuizAttemptController;
 use App\Http\Controllers\Api\Student\QuizAttemptHistoryController;
 use App\Http\Controllers\Api\Student\ReportCaseController;
+use App\Http\Controllers\Api\Student\SearchController;
 use App\Http\Controllers\Api\Student\StudyResumeController;
 use App\Http\Controllers\Api\Student\StudySessionController;
 use App\Http\Controllers\Api\Student\SubjectController;
@@ -44,6 +45,7 @@ use Illuminate\Support\Facades\Route;
 // offer, and what they last did. A summary only — every section's items are
 // opened through the dedicated endpoints below, and nothing here writes.
 Route::get('dashboard', DashboardController::class)->name('dashboard');
+Route::get('search', SearchController::class)->name('search');
 
 // Plans and the student's own subscription. Deliberately outside every
 // `feature:*` gate below: a student with no plan reaches these, and only these,

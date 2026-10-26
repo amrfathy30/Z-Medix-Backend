@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'request_type' => 'Request type',
+    'request_types' => ['new' => 'New Subscription', 'renewal' => 'Renewal'],
     'features' => [
         'library' => 'Library',
         'question_bank' => 'Question Bank',

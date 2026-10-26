@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\BillingCycle;
 use App\Enums\SubscriptionRequestStatus;
+use App\Enums\SubscriptionRequestType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,7 @@ class SubscriptionRequest extends Model
         'user_id',
         'plan_id',
         'billing_cycle',
+        'request_type',
         'status',
         'admin_note',
         'handled_by',
@@ -33,12 +35,14 @@ class SubscriptionRequest extends Model
 
     protected $attributes = [
         'status' => 'pending',
+        'request_type' => 'new',
     ];
 
     protected function casts(): array
     {
         return [
             'billing_cycle' => BillingCycle::class,
+            'request_type' => SubscriptionRequestType::class,
             'status' => SubscriptionRequestStatus::class,
             'handled_at' => 'datetime',
             'pricing_snapshot' => 'array',
