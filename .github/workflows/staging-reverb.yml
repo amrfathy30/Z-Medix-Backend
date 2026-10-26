@@ -35,7 +35,7 @@ jobs:
           ACTION: ${{ inputs.action }}
           APP_PATH: ${{ vars.STAGING_APP_PATH || '/var/www/zmedix-backend' }}
           PHP_BIN: ${{ vars.STAGING_PHP_BIN || 'php' }}
-          REVERB_PORT: ${{ vars.STAGING_REVERB_INTERNAL_PORT || '8081' }}
+          REVERB_PORT: ${{ vars.STAGING_REVERB_INTERNAL_PORT || '8082' }}
           WS_HOST: zmedixapi.pulvent.com
           WS_ORIGINS: zmedixadmin.pulvent.com,localhost:3000,127.0.0.1:3000
         with:
