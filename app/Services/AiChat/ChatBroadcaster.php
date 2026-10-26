@@ -13,7 +13,7 @@ class ChatBroadcaster
 {
     public function changed(AiMessage $message, string $event): void
     {
-        $payload = (new AiMessageResource($message))->resolve();
+        $payload = (new AiMessageResource($message->loadMissing('attachments')))->resolve();
         $payload['message_id'] = $message->id;
         DB::afterCommit(function () use ($event, $payload): void {
             try {

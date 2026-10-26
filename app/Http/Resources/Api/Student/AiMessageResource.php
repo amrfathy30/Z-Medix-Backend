@@ -15,6 +15,11 @@ class AiMessageResource extends JsonResource
             'conversation_id' => $this->conversation_id,
             'reply_to_message_id' => $this->reply_to_message_id,
             'role' => $this->role,
+            'attachments' => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn ($attachment): array => [
+                'type' => $attachment->reference_type,
+                'id' => $attachment->reference_id,
+                'snapshot' => $attachment->snapshot,
+            ])->all()),
             'content' => $this->content,
             'status' => $this->status,
             'client_message_id' => $this->client_message_id,

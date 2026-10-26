@@ -7,7 +7,7 @@ The application already had Laravel 12, Sanctum student tokens, the `feature:ai`
 ## Local setup
 
 1. Install the updated lockfile with `composer install` if checking out these changes elsewhere.
-2. Run `php artisan migrate --no-interaction`. The two new migrations create `ai_conversations` and `ai_messages`; they do not alter learning tables. Review other pending application migrations before running this command on an existing deployment.
+2. Run `php artisan migrate --no-interaction`. The chat migrations create `ai_conversations`, `ai_messages`, and `ai_message_attachments`; they do not alter learning tables. Review other pending application migrations before running this command on an existing deployment.
 3. Configure the following backend environment variables (use your own generated Reverb credentials; these are application credentials for your self-hosted server, with no Pusher subscription):
 
 ```dotenv
@@ -81,7 +81,7 @@ Send payload:
 {"content":"Test question","client_message_id":"c7871b69-00a8-45b0-8f63-a61c9019e340"}
 ```
 
-`content` is required, nonblank, and at most 10,000 characters. `client_message_id` is required, 1–100 ASCII letters/digits/underscores/hyphens (UUIDs work). Keep the same key and content on network retries. Reuse with different content gives 422. Keys are scoped to the conversation. Database uniqueness and the conversation row lock prevent duplicate user messages; a unique `reply_to_message_id` prevents duplicate assistant replies.
+`content` is required, nonblank, and at most 10,000 characters. `client_message_id` is required, 1–100 ASCII letters/digits/underscores/hyphens (UUIDs work). Keep the same key, content, and attachment reference set on network retries. Reuse with different content or references gives 422. Attachment order does not affect retry identity; omitted attachments and an empty array are equivalent. Keys are scoped to the conversation. Database uniqueness and the conversation row lock prevent duplicate user messages; a unique `reply_to_message_id` prevents duplicate assistant replies.
 
 Single conversation success:
 
@@ -119,7 +119,7 @@ Echo subscribes to `student.ai.conversation.{id}` using `.private()`. The wire c
 | `chat.response.completed` | Complete response persisted; `content` contains the complete answer |
 | `chat.response.failed` | Terminal failure persisted; `content:null` and safe `error_code` |
 
-All payloads include `conversation_id`, `message_id`, `reply_to_message_id`, `role`, `status`, `content`, `client_message_id`, `correlation_id`, `error_code`, `created_at`, and `updated_at`. Pending/processing assistant content is null. No chunks or token events exist. Client-originated socket events are disabled; send through REST.
+All payloads include `attachments` (an empty array for messages without attachments), `conversation_id`, `message_id`, `reply_to_message_id`, `role`, `status`, `content`, `client_message_id`, `correlation_id`, `error_code`, `created_at`, and `updated_at`. Pending/processing assistant content is null. No chunks or token events exist. Client-originated socket events are disabled; send through REST.
 
 Assistant lifecycle: `pending → processing → completed | failed`. Retries may emit `processing` again. User messages start completed. Failures use `AGENT_UNAVAILABLE`, `AGENT_FAILED`, or `SCHEDULING_FAILED`; no Agent exceptions or credentials are returned. Response content is currently limited to 20,000 UTF-8 bytes; oversized, empty, or mismatched-correlation replies are treated as Agent failures. Reverb request/message defaults are 262,144 bytes to allow complete escaped Unicode payloads; keep proxy/server limits compatible.
 
@@ -195,9 +195,9 @@ Also refresh when the tab becomes visible, use REST polling for nonterminal repl
 
 ## Persistence, deletion and Agent handoff
 
-Conversations are permanently deleted, with database cascading deletion of all messages. Jobs carry only the assistant message ID and never create conversations. Deleted pending jobs become no-ops, and late Agent results cannot recreate rows. Completion locks the conversation and checks a per-attempt token so a superseded attempt cannot overwrite the persisted response. The Agent call runs outside the database transaction. Already-authorized socket clients may receive an event queued before deletion; REST 404 is authoritative.
+Conversations are permanently deleted, with database cascading deletion of all messages and their attachments. Educational source records and files are never deleted by chat deletion. Jobs carry only the assistant message ID and never create conversations. Deleted pending jobs become no-ops, and late Agent results cannot recreate rows. Completion locks the conversation and checks a per-attempt token so a superseded attempt cannot overwrite the persisted response. The Agent call runs outside the database transaction. Already-authorized socket clients may receive an event queued before deletion; REST 404 is authoritative.
 
-Implement `App\Contracts\AiChatAgentInterface::generateResponse(AgentChatRequest): AgentChatResponse` and replace its container binding in `AppServiceProvider` for the agreed adapter. Request DTO: conversation ID, user message ID, current question content, correlation UUID. Response DTO: complete content and the same correlation UUID. No history is currently passed; agree context handling with the AI developer before extending this DTO. The adapter must honor the worker deadline and avoid logging sensitive request content. The API, database and event contracts need no change for a complete-response adapter.
+Implement `App\Contracts\AiChatAgentInterface::generateResponse(AgentChatRequest): AgentChatResponse` and replace its container binding in `AppServiceProvider` for the agreed adapter. Request DTO: conversation ID, user message ID, current question content, correlation UUID, and `attachments` from persisted attachment rows (see below). Response DTO: complete content and the same correlation UUID. No history is currently passed; agree context handling with the AI developer before extending this DTO. The adapter must honor the worker deadline and avoid logging sensitive request content. The API, database and event contracts need no change for a complete-response adapter.
 
 The AI developer owns provider/protocol/authentication decisions, medical processing, context strategy and actual answer generation. AI credit consumption/accounting is not implemented by this infrastructure; only the existing AI feature entitlement is applied. Deployment needs migrations, durable queue workers, shared cache locks, scheduler, Reverb process, approved origins, CORS for the separate frontend as applicable, TLS/proxy settings, and normal process restarts after releases. No deployment infrastructure was modified.
 
@@ -206,6 +206,7 @@ The AI developer owns provider/protocol/authentication decisions, medical proces
 Run only the module tests:
 
 ```sh
+php artisan test --compact tests/Feature/AiChat/AiChatAttachmentTest.php
 php artisan test --compact tests/Feature/AiChat/AiChatTest.php
 php artisan test --compact tests/Feature/AiChat/ReverbSmokeTest.php
 ```
@@ -238,3 +239,86 @@ Modified:
 - `bootstrap/app.php` — Sanctum/AI feature protected broadcast authorization
 - `routes/api/student.php` — eight chat REST endpoints
 - `routes/console.php` — recovery schedule
+
+
+## Educational attachments
+
+The existing message submission endpoint accepts an optional `attachments` list. Each entry must contain only `type` and `id`. Supported types are `book` (platform books, PDF or content), `chapter`, `highlight` and `note`. Private student books, file uploads, PDF pages, client snapshots and version IDs are not accepted. A PDF reference always means the whole book; no PDF bytes are read or copied by chat.
+
+```json
+{
+  "content": "Explain these topics.",
+  "client_message_id": "attachment-example-1",
+  "attachments": [
+    {"type": "book", "id": 25},
+    {"type": "chapter", "id": 12},
+    {"type": "highlight", "id": 45},
+    {"type": "note", "id": 89}
+  ]
+}
+```
+
+Up to 10 references are allowed, with no repeated `(type, id)` pair. IDs must be positive integers. Combined server-resolved snapshot data is limited to 100,000 JSON-encoded bytes (`ai_chat.max_attachment_snapshot_bytes`); oversized selections return 422 without truncation. This leaves room for message text and envelope data within the existing Reverb request limit. A null attachments value is invalid; omit the field or send `[]` for text-only messages. Text remains required.
+
+Laravel resolves every snapshot from existing records. Books must be published under a published subject. Chapters must satisfy the existing `StudyAccessService` publication and predecessor-completion rules. Notes and highlights must belong to the authenticated student and their source chapter/page must remain accessible. Deleted, unavailable and unauthorized references return the same 422 reference-validation error before any message is created. Existing conversation ownership and AI subscription checks still apply.
+
+The message, attachments and pending assistant reply are persisted in one transaction. The conversation lock and existing idempotency key protect retries. An identical retry returns the original records and snapshots even after a source is edited, deleted, or becomes inaccessible; it does not read the sources again or queue a second response. Changing the text or reference set under the same key returns 422. To ask a new question against current source content, use a new key.
+
+All message REST responses (submission, detail, pagination) and Reverb message payloads add `attachments`. For example, the following is the attachment field of a user message:
+
+```json
+{
+  "attachments": [
+    {"type": "book", "id": 25, "snapshot": {"title": "Cardiology", "book_type": "pdf", "subject_id": 3, "source_updated_at": "2026-10-26T12:00:00+00:00", "media_id": 70, "media_uuid": "aa8cd337-d6dd-445c-a582-803116d8a104", "media_updated_at": "2026-10-26T12:00:00+00:00"}},
+    {"type": "chapter", "id": 12, "snapshot": {"title": "Heart failure", "subject_id": 3, "source_updated_at": "2026-10-26T12:00:00+00:00"}},
+    {"type": "highlight", "id": 45, "snapshot": {"selected_text": "Exact highlighted passage", "chapter_page_id": 18, "chapter_id": 12, "subject_id": 3}},
+    {"type": "note", "id": 89, "snapshot": {"selected_text": "Original passage", "content": "Exact student note", "chapter_page_id": 18, "chapter_id": 12, "subject_id": 3}}
+  ]
+}
+```
+
+Snapshot fields:
+
+| Type | Persisted snapshot |
+|---|---|
+| PDF book | Title, `book_type: pdf`, subject ID, observed book update time, media ID/UUID and observed media update time; media fields are null if no PDF is currently attached |
+| Content book | Title, `book_type: content`, subject ID and observed book update time; no page bodies |
+| Chapter | Title, subject ID and observed chapter update time; no page bodies |
+| Highlight | Exact `selected_text`, chapter-page ID, chapter ID, subject ID |
+| Note | Exact `content` and `selected_text`, chapter-page ID, chapter ID, subject ID |
+
+Render snapshots for historical display, without requiring the source to exist. Annotation text and titles survive edits/deletion. Treat saved text as untrusted display content and escape/sanitize it. History eagerly loads attachments in one query per page and never resolves source records. Attachments have a foreign key only to their message, so deleting educational content does not remove saved snapshots; deleting chat does not remove educational content.
+
+### Persisted Agent contract
+
+`AgentChatRequest::$attachments` defaults to `[]` for compatibility. Each entry has the shape:
+
+```php
+[
+    'reference_type' => 'note',
+    'reference_id' => 89,
+    'snapshot' => [
+        'selected_text' => 'Original passage',
+        'content' => 'Exact student note',
+        'chapter_page_id' => 18,
+        'chapter_id' => 12,
+        'subject_id' => 3,
+    ],
+]
+```
+
+`ProcessAiChatResponse` builds this array exclusively from the user message's saved `ai_message_attachments` rows on every attempt. It does not use HTTP input or look up live educational sources. Unique message/type/ID constraints prevent duplicated references. Edited or deleted notes/highlights never replace historical text in the Agent DTO. The Mock Agent, durable asynchronous scheduling, private channels and complete-response events remain unchanged. No retrieval, embeddings, PDF processing or medical AI behavior is implemented.
+
+### Historical content consistency and frontend-handoff limitation
+
+**Full historical Book/Chapter content reproducibility is not supported by the current learning architecture. This feature is not ready for a handoff that requires that guarantee.**
+
+Inspection of Book, Chapter, page models and learning migrations found no content revision IDs, revision tables or immutable page versions. `source_updated_at` is observation metadata, not a version identifier: a page edit need not update its parent book/chapter timestamp. Titles, original IDs and timestamps cannot prove unchanged content. Content-book and chapter snapshots preserve historical display labels and identifiers only, not their original page bodies.
+
+PDF snapshots identify the media record selected at submission using its real media ID and UUID. These identifiers are not immutable file versions or checksums. Books use the Media Library `singleFile()` collection; replacement deletes the previous media row and file. Chat retains the old ID/UUID but cannot recover deleted PDF bytes or guarantee detection of in-place file changes. It neither follows replacement media automatically nor invents a version ID. Books without media save null media identifiers. No paths or temporary download URLs are treated as version evidence.
+
+The smallest safe architectural solution is a shared learning-content revision store, outside chat snapshots: retain PDF objects under immutable version keys instead of deleting versions referenced by chat; record an immutable revision manifest for content books/chapters pointing to immutable page revisions; atomically publish a current revision and save its revision ID with each chat attachment. Define retention for referenced revisions and back up their objects. A checksum alone can detect change but cannot restore deleted content. This requires a focused change to learning publish/edit/file-replacement lifecycle and storage retention, and has deliberately not been introduced as an incidental chat change. Existing chats cannot retroactively recover already replaced material.
+
+Before frontend handoff requiring guaranteed original learning context, implement that revision/retention design and extend the saved snapshots/Agent contract with actual immutable revision IDs. Until then, frontend can display historical snapshots but must not promise historical Book/Chapter content access. Apply the new `2026_10_26_123619_create_ai_message_attachments_table.php` migration through the normal release process; it has been exercised only against the isolated test database here. No deployment workflows were changed.
+
+Attachment files added: `app/Models/AiMessageAttachment.php`, `app/Services/AiChat/AttachmentResolver.php`, `database/migrations/2026_10_26_123619_create_ai_message_attachments_table.php`, and `tests/Feature/AiChat/AiChatAttachmentTest.php`. Existing chat service, message request/controller/resource/model, broadcaster, Agent DTO/job and configuration were extended.

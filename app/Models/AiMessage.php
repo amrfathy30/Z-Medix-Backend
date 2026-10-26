@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class AiMessage extends Model
@@ -23,6 +24,11 @@ class AiMessage extends Model
     public function replyTo(): BelongsTo
     {
         return $this->belongsTo(self::class, 'reply_to_message_id');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(AiMessageAttachment::class)->orderBy('id');
     }
 
     public function response(): HasOne
