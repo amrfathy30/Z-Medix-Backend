@@ -27,437 +27,96 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     timeout-minutes: 20
-
     steps:
       - name: Manage Z-Medix Reverb
         uses: appleboy/ssh-action@v1.0.3
         env:
           ACTION: ${{ inputs.action }}
-          APP_PATH: ${{ vars.STAGING_APP_PATH || '/var/www/zmedix-backend' }}
-          PHP_BIN: ${{ vars.STAGING_PHP_BIN || 'php' }}
-          REVERB_PORT: ${{ vars.STAGING_REVERB_INTERNAL_PORT || '8082' }}
+          APP_PATH: /var/www/zmedix-backend
+          REVERB_PORT: '8082'
           WS_HOST: zmedixapi.pulvent.com
-          WS_ORIGINS: zmedixadmin.pulvent.com,localhost:3000,127.0.0.1:3000
+          WS_ORIGINS: zmedixadmin.pulvent.com,localhost,127.0.0.1
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ vars.STAGING_SSH_PORT || 22 }}
-          timeout: 60s
           command_timeout: 15m
-          envs: ACTION,APP_PATH,PHP_BIN,REVERB_PORT,WS_HOST,WS_ORIGINS
+          envs: ACTION,APP_PATH,REVERB_PORT,WS_HOST,WS_ORIGINS
           script: |
             bash -se <<'REMOTE'
             set -euo pipefail
 
-            fail() {
-              echo "ERROR: $*" >&2
-              exit 1
-            }
-
+            fail() { echo "ERROR: $*" >&2; exit 1; }
             root() {
-              if [ "$(id -u)" -eq 0 ]; then
-                "$@"
-              else
-                sudo -n "$@"
-              fi
+              if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -n "$@"; fi
             }
-
-            get_status() {
-              root supervisorctl status zmedix-reverb 2>&1 || true
-            }
-
-            cd "$APP_PATH" || fail "Application directory missing"
-
-            PHP_BIN="$(command -v "$PHP_BIN")" ||
-              fail "PHP executable missing"
-
-            test -f vendor/autoload.php ||
-              fail "Composer dependencies missing"
-
-            command -v supervisorctl >/dev/null ||
-              fail "Run Staging Setup first"
+            status() { root supervisorctl status zmedix-reverb 2>&1 || true; }
+            running() { [[ "$(status)" == *RUNNING* ]]; }
+            PHP_BIN="$(command -v php8.4 || command -v php)" || fail 'PHP missing'
+            cd "$APP_PATH" || fail 'Z-Medix directory missing'
+            test -f artisan && test -f vendor/autoload.php || fail 'Laravel deployment missing'
+            command -v supervisorctl >/dev/null || fail 'Supervisor missing'
 
             "$PHP_BIN" -r '
               require "vendor/autoload.php";
               $app = require "bootstrap/app.php";
-              $app->make(
-                Illuminate\Contracts\Console\Kernel::class
-              )->bootstrap();
+              $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+              if (! $app->environment("local")) { fwrite(STDERR, "APP_ENV must be local\n"); exit(1); }
+              if (! class_exists(Laravel\Reverb\ReverbServiceProvider::class)) { exit(1); }
+            ' || fail 'Wrong environment or Reverb package missing'
 
-              if (! $app->environment("local")) {
-                fwrite(STDERR, "APP_ENV must be local\n");
-                exit(1);
-              }
-
-              if (! class_exists(
-                Laravel\Reverb\ReverbServiceProvider::class
-              )) {
-                fwrite(STDERR, "Laravel Reverb package missing\n");
-                exit(1);
-              }
-            '
-
-            echo "=== Z-MEDIX REVERB ==="
-            echo "Action: $ACTION"
-            echo "Server: $(hostname)"
-            echo "Application: $APP_PATH"
-
-            diagnose_reverb() {
-              echo ""
-              echo "=== SUPERVISOR STATUS ==="
-              get_status
-
-              echo ""
-              echo "=== SUPERVISOR CONFIG ==="
-              root grep -E \
-                '^(command|directory|user|autostart|autorestart|stdout_logfile)=' \
-                /etc/supervisor/conf.d/zmedix-reverb.conf || true
-
-              echo ""
-              echo "=== SUPERVISOR JOURNAL ==="
-              root journalctl -u supervisor \
-                -n 50 --no-pager 2>&1 || true
-
-              echo ""
-              echo "=== SUPERVISOR LOG ==="
-              root tail -n 60 \
-                /var/log/supervisor/supervisord.log 2>&1 || true
-
-              echo ""
-              echo "=== REVERB LOG ==="
-              root tail -n 60 \
-                storage/logs/zmedix-reverb.log 2>&1 || true
-
-              echo ""
-              echo "=== PORT 8081 STATUS ==="
-              root ss -ltnp \
-                "( sport = :$REVERB_PORT )" 2>&1 || true
-
-              echo ""
-              echo "=== APPLICATION PERMISSIONS ==="
-              ls -ld \
-                . \
-                artisan \
-                .env \
-                storage \
-                storage/logs \
-                bootstrap/cache || true
-
-              echo ""
-              echo "=== PHP ==="
-              "$PHP_BIN" -v | head -n 2 || true
-
-              echo ""
-              echo "=== REVERB CONFIGURATION ==="
+            diagnose() {
+              echo '=== Z-MEDIX SUPERVISOR ==='
+              status
+              root grep -E '^(command|directory|user|stdout_logfile)=' /etc/supervisor/conf.d/zmedix-reverb.conf || true
+              echo '=== REVERB LOG ==='
+              root tail -n 35 "$APP_PATH/storage/logs/zmedix-reverb.log" 2>&1 || true
+              echo '=== PORT ==='
+              root ss -ltnp "( sport = :$REVERB_PORT )" || true
+              echo '=== ENV (NON-SECRET) ==='
               "$PHP_BIN" -r '
                 require "vendor/autoload.php";
                 $app = require "bootstrap/app.php";
-                $app->make(
-                  Illuminate\Contracts\Console\Kernel::class
-                )->bootstrap();
-
-                echo "broadcast=" .
-                  config("broadcasting.default") . "\n";
-
-                echo "server_host=" .
-                  config("reverb.servers.reverb.host") . "\n";
-
-                echo "server_port=" .
-                  config("reverb.servers.reverb.port") . "\n";
-
-                foreach (["app_id", "key", "secret"] as $field) {
-                  $configured = filled(
-                    config("reverb.apps.apps.0.{$field}")
-                  );
-
-                  echo "{$field}=" .
-                    ($configured ? "SET" : "MISSING") . "\n";
-                }
+                $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+                echo "broadcast=".config("broadcasting.default")."\n";
+                echo "server_port=".config("reverb.servers.reverb.port")."\n";
               ' || true
-
-              echo ""
-              echo "=== END DIAGNOSTICS ==="
             }
 
-            discover_nginx_site() {
-              command -v nginx >/dev/null ||
-                fail "Nginx missing"
-
-              local dump
-              dump="$(mktemp)"
-
-              if ! root nginx -T >"$dump" 2>&1; then
-                rm -f "$dump"
-                fail "Existing Nginx configuration is invalid"
-              fi
-
-              NGINX_SITE="$(python3 - "$dump" "$WS_HOST" <<'PY'
-            import pathlib
-            import re
-            import sys
-
-            dump, host = sys.argv[1:]
-            text = pathlib.Path(dump).read_text()
-
-            sections = re.split(
-                r'(?m)^# configuration file ([^:\n]+):\s*$',
-                text
-            )
-
-            found = set()
-
-            for i in range(1, len(sections) - 1, 2):
-                path, content = sections[i], sections[i + 1]
-                depth, start = 0, None
-
-                for line in content.splitlines(keepends=True):
-                    clean = line.split('#', 1)[0]
-
-                    if start is None and re.match(
-                        r'^\s*server\s*\{',
-                        clean
-                    ):
-                        start = []
-
-                    if start is not None:
-                        start.append(line)
-
-                    depth += clean.count('{') - clean.count('}')
-
-                    if start is not None and depth == 0:
-                        block = ''.join(start)
-
-                        names = re.findall(
-                            r'\bserver_name\s+([^;]+);',
-                            block
-                        )
-
-                        has_host = any(
-                            host in group.split()
-                            for group in names
-                        )
-
-                        has_tls = bool(re.search(
-                            r'\blisten\s+[^;]*\b443\b',
-                            block
-                        ))
-
-                        if has_host and has_tls:
-                            found.add(
-                                str(pathlib.Path(path).resolve())
-                            )
-
-                        start = None
-
-            if len(found) != 1:
-                sys.exit(
-                    f'ERROR: expected one HTTPS Nginx site '
-                    f'for {host}; found {len(found)}'
-                )
-
-            site = next(iter(found))
-
-            if not site.startswith('/etc/nginx/'):
-                sys.exit(
-                    'ERROR: Nginx site outside /etc/nginx'
-                )
-
-            print(site)
-            PY
-              )" || {
-                rm -f "$dump"
-                fail "Cannot discover Nginx site"
-              }
-
-              rm -f "$dump"
-
-              echo "Nginx site: $NGINX_SITE"
-            }
-
-            configure_nginx() {
-              discover_nginx_site
-
-              local snippet backup
-              snippet="/etc/nginx/snippets/zmedix-reverb.conf"
-
-              root mkdir -p /etc/nginx/snippets
-
-              if root test -e "$snippet"; then
-                root grep -q \
-                  'zmedix-managed-reverb-v1' "$snippet" ||
-                  fail "Existing Reverb snippet is not owned by Z-Medix"
-              fi
-
-              root tee "$snippet" >/dev/null <<EOF
-            # zmedix-managed-reverb-v1
-
-            location ^~ /app/ {
-                proxy_pass http://127.0.0.1:${REVERB_PORT};
-                proxy_http_version 1.1;
-                proxy_set_header Host \$host;
-                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto \$scheme;
-                proxy_set_header Upgrade \$http_upgrade;
-                proxy_set_header Connection "upgrade";
-                proxy_read_timeout 3600s;
-            }
-
-            location ^~ /apps/ {
-                proxy_pass http://127.0.0.1:${REVERB_PORT};
-                proxy_http_version 1.1;
-                proxy_set_header Host \$host;
-                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto \$scheme;
-            }
-            EOF
-
-              backup="$(root python3 - "$NGINX_SITE" "$WS_HOST" "$snippet" <<'PY'
-            import pathlib
-            import re
-            import shutil
-            import sys
-            from datetime import datetime, timezone
-
-            path = pathlib.Path(sys.argv[1])
-            host = sys.argv[2]
-            snippet = sys.argv[3]
-
-            lines = path.read_text().splitlines(keepends=True)
-            include = f'include {snippet};'
-
-            if include in ''.join(lines):
-                print('ALREADY_CONFIGURED')
-                sys.exit(0)
-
-            depth, start, matches = 0, None, []
-
-            for i, line in enumerate(lines):
-                clean = line.split('#', 1)[0]
-
-                if start is None and re.match(
-                    r'^\s*server\s*\{',
-                    clean
-                ):
-                    start = i
-
-                depth += clean.count('{') - clean.count('}')
-
-                if start is not None and depth == 0:
-                    block = ''.join(lines[start:i + 1])
-
-                    names = re.findall(
-                        r'\bserver_name\s+([^;]+);',
-                        block
-                    )
-
-                    tls = bool(re.search(
-                        r'\blisten\s+[^;]*\b443\b',
-                        block
-                    ))
-
-                    if tls and any(
-                        host in group.split()
-                        for group in names
-                    ):
-                        if re.search(
-                            r'\blocation\s+(?:\^~\s*)?/apps?/',
-                            block
-                        ):
-                            sys.exit(
-                                'ERROR: WebSocket locations '
-                                'already exist; refusing to modify'
-                            )
-
-                        matches.append(start)
-
-                    start = None
-
-            if len(matches) != 1:
-                sys.exit(
-                    f'ERROR: expected exactly one HTTPS '
-                    f'server block; got {len(matches)}'
-                )
-
-            backup = pathlib.Path(
-                str(path) + '.zmedix-backup-' +
-                datetime.now(timezone.utc).strftime(
-                    '%Y%m%d%H%M%S'
-                )
-            )
-
-            shutil.copy2(path, backup)
-
-            lines.insert(
-                matches[0] + 1,
-                f'    {include}\n'
-            )
-
-            path.write_text(''.join(lines))
-
-            print(backup)
-            PY
-              )" || fail "Nginx site update refused"
-
-              if ! root nginx -t; then
-                if [ "$backup" != ALREADY_CONFIGURED ]; then
-                  root cp "$backup" "$NGINX_SITE"
-                  root nginx -t || true
+            preflight() {
+              [[ "$REVERB_PORT" =~ ^[0-9]+$ ]] || fail 'Invalid port'
+              # Never replace or kill another service using this port.
+              if root ss -ltnH "( sport = :$REVERB_PORT )" | grep -q .; then
+                if ! running; then
+                  fail "Port $REVERB_PORT is occupied; refusing to touch the owner"
                 fi
-
-                fail "Nginx test failed; site restored when changed"
               fi
-
-              root systemctl reload nginx
-
-              echo "Nginx ready"
+              root test -f /etc/nginx/sites-available/zmedixapi.pulvent.com || fail 'Z-Medix Nginx site missing'
+              root test -f /etc/supervisor/conf.d/zmedix-reverb.conf || fail 'Z-Medix Supervisor config missing'
+              root nginx -t || fail 'Existing Nginx configuration invalid'
             }
 
             configure_env() {
               python3 - "$REVERB_PORT" "$WS_ORIGINS" <<'PY'
-            import os
-            import pathlib
-            import secrets
-            import shutil
-            import sys
-            import tempfile
+            import os, pathlib, secrets, shutil, sys, tempfile
             from datetime import datetime, timezone
-
             port, origins = sys.argv[1:]
             path = pathlib.Path('.env')
-
-            if not path.is_file():
-                sys.exit('ERROR: Laravel .env missing')
-
-            original, st = path.read_text(), path.stat()
-            lines = original.splitlines()
-
-            values = dict(
-                line.split('=', 1)
-                for line in lines
-                if '=' in line and
-                not line.lstrip().startswith('#')
-            )
-
-            values = {
-                k.strip(): v.strip().strip('"\'')
-                for k, v in values.items()
-            }
-
+            if not path.is_file(): sys.exit('ERROR: .env missing')
+            old = path.read_text()
+            st = path.stat()
+            rows = old.splitlines()
+            current = {}
+            for row in rows:
+                if '=' in row and not row.lstrip().startswith('#'):
+                    k, v = row.split('=', 1)
+                    current[k.strip()] = v.strip().strip('"\'')
             updates = {
                 'BROADCAST_CONNECTION': 'reverb',
-                'REVERB_APP_ID':
-                    values.get('REVERB_APP_ID') or
-                    str(
-                        secrets.randbelow(90000000) +
-                        10000000
-                    ),
-                'REVERB_APP_KEY':
-                    values.get('REVERB_APP_KEY') or
-                    secrets.token_hex(16),
-                'REVERB_APP_SECRET':
-                    values.get('REVERB_APP_SECRET') or
-                    secrets.token_hex(32),
+                'REVERB_APP_ID': current.get('REVERB_APP_ID') or str(secrets.randbelow(90000000)+10000000),
+                'REVERB_APP_KEY': current.get('REVERB_APP_KEY') or secrets.token_hex(16),
+                'REVERB_APP_SECRET': current.get('REVERB_APP_SECRET') or secrets.token_hex(32),
                 'REVERB_SERVER_HOST': '127.0.0.1',
                 'REVERB_SERVER_PORT': port,
                 'REVERB_HOST': '127.0.0.1',
@@ -465,186 +124,141 @@ jobs:
                 'REVERB_SCHEME': 'http',
                 'REVERB_ALLOWED_ORIGINS': origins,
             }
-
-            out, seen = [], set()
-
-            for line in lines:
-                key = (
-                    line.split('=', 1)[0].strip()
-                    if '=' in line and
-                    not line.lstrip().startswith('#')
-                    else None
-                )
-
-                if key in updates:
-                    if key not in seen:
-                        out.append(
-                            f'{key}={updates[key]}'
-                        )
-                        seen.add(key)
+            result, seen = [], set()
+            for row in rows:
+                k = row.split('=',1)[0].strip() if '=' in row and not row.lstrip().startswith('#') else None
+                if k in updates:
+                    if k not in seen:
+                        result.append(f'{k}={updates[k]}')
+                        seen.add(k)
                 else:
-                    out.append(line)
-
-            out.extend(
-                f'{k}={v}'
-                for k, v in updates.items()
-                if k not in seen
-            )
-
-            backup = pathlib.Path(
-                '.env.reverb-backup-' +
-                datetime.now(timezone.utc).strftime(
-                    '%Y%m%d%H%M%S%f'
-                )
-            )
-
+                    result.append(row)
+            result += [f'{k}={v}' for k,v in updates.items() if k not in seen]
+            if '\n'.join(result)+'\n' == old:
+                print('Laravel Reverb .env already correct')
+                sys.exit(0)
+            backup = pathlib.Path('.env.reverb-backup-'+datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f'))
             shutil.copy2(path, backup)
             os.chmod(backup, 0o600)
-
-            fd, tmp = tempfile.mkstemp(
-                prefix='.env.reverb-',
-                dir='.'
-            )
-
+            fd, tmp = tempfile.mkstemp(prefix='.env.reverb-', dir='.')
             try:
-                with os.fdopen(fd, 'w') as file:
-                    file.write(
-                        '\n'.join(out) + '\n'
-                    )
-
-                os.chmod(
-                    tmp,
-                    st.st_mode & 0o777
-                )
-
-                os.chown(
-                    tmp,
-                    st.st_uid,
-                    st.st_gid
-                )
-
-                os.replace(tmp, path)
+                with os.fdopen(fd,'w') as f: f.write('\n'.join(result)+'\n')
+                os.chmod(tmp,st.st_mode & 0o777)
+                os.chown(tmp,st.st_uid,st.st_gid)
+                os.replace(tmp,path)
             finally:
-                if os.path.exists(tmp):
-                    os.unlink(tmp)
-
-            print(
-                'Reverb .env configured; backup saved'
-            )
+                if os.path.exists(tmp): os.unlink(tmp)
+            print('Laravel Reverb .env updated; backup saved')
             PY
-
               "$PHP_BIN" artisan optimize:clear
+            }
 
-              "$PHP_BIN" -r '
-                require "vendor/autoload.php";
-                $app = require "bootstrap/app.php";
-                $app->make(
-                  Illuminate\Contracts\Console\Kernel::class
-                )->bootstrap();
+            configure_nginx() {
+              local site='/etc/nginx/sites-available/zmedixapi.pulvent.com'
+              local snippet='/etc/nginx/snippets/zmedix-reverb.conf'
+              if root test -e "$snippet"; then
+                root grep -q 'zmedix-managed-reverb-v1' "$snippet" || fail 'Unmanaged Nginx snippet exists'
+              fi
+              root mkdir -p /etc/nginx/snippets
+              root python3 - "$snippet" "$REVERB_PORT" <<'PY'
+            import pathlib, shutil, sys
+            from datetime import datetime, timezone
+            path = pathlib.Path(sys.argv[1])
+            port = sys.argv[2]
+            new = f'''# zmedix-managed-reverb-v1
+            location ^~ /app/ {{
+                proxy_pass http://127.0.0.1:{port};
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_read_timeout 3600s;
+            }}
+            location ^~ /apps/ {{
+                proxy_pass http://127.0.0.1:{port};
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }}
+            '''
+            if path.exists() and path.read_text() == new:
+                print('Nginx Reverb snippet already correct')
+            else:
+                if path.exists():
+                    shutil.copy2(path,str(path)+'.bak-'+datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f'))
+                path.write_text(new)
+                print('Nginx Reverb snippet configured')
+            PY
+              # Previous successful run already inserted the include in the correct HTTPS block.
+              root grep -qF 'include /etc/nginx/snippets/zmedix-reverb.conf;' "$site" || fail 'Nginx include absent; not modifying shared Nginx blindly'
+              root nginx -t || fail 'Nginx configuration invalid; reload refused'
+              root systemctl reload nginx
+              echo 'Z-Medix Nginx ready'
+            }
 
-                if (
-                  config("broadcasting.default") !== "reverb"
-                ) {
-                  exit(1);
-                }
+            configure_supervisor() {
+              local conf='/etc/supervisor/conf.d/zmedix-reverb.conf'
+              root python3 - "$conf" "$REVERB_PORT" <<'PY'
+            import pathlib, re, shutil, sys
+            from datetime import datetime, timezone
+            path = pathlib.Path(sys.argv[1]); port=sys.argv[2]
+            old = path.read_text()
+            pattern = r'(?m)^(command=.+?/artisan reverb:start --host=127\.0\.0\.1 --port=)\d+(\b.*)$'
+            if len(re.findall(pattern, old)) != 1:
+                sys.exit('ERROR: Unexpected Z-Medix Supervisor command; refusing change')
+            new = re.sub(pattern, lambda m: m.group(1)+port+m.group(2), old, count=1)
+            if new != old:
+                shutil.copy2(path,str(path)+'.bak-'+datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f'))
+                path.write_text(new)
+                print('Z-Medix Supervisor port updated to '+port)
+            else: print('Z-Medix Supervisor already uses '+port)
+            PY
+              root supervisorctl reread
+              root supervisorctl update zmedix-reverb
+              root grep '^command=' "$conf"
+            }
 
-                foreach (
-                  ["app_id", "key", "secret"] as $k
-                ) {
-                  if (! filled(
-                    config("reverb.apps.apps.0.$k")
-                  )) {
-                    exit(1);
-                  }
-                }
-
-                if (
-                  config("reverb.servers.reverb.host")
-                  !== "127.0.0.1"
-                ) {
-                  exit(1);
-                }
-              ' || fail "Reverb config validation failed"
+            start_reverb() {
+              if running; then
+                root supervisorctl restart zmedix-reverb || { diagnose; fail 'Reverb restart failed'; }
+              else
+                root supervisorctl start zmedix-reverb || { diagnose; fail 'Reverb start failed'; }
+              fi
+              running || { diagnose; fail 'Reverb not running'; }
+              echo "$(status)"
             }
 
             verify_public() {
               local key
-
               key="$("$PHP_BIN" -r '
                 require "vendor/autoload.php";
                 $app = require "bootstrap/app.php";
-                $app->make(
-                  Illuminate\Contracts\Console\Kernel::class
-                )->bootstrap();
-
-                echo config(
-                  "reverb.apps.apps.0.key"
-                );
+                $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+                echo config("reverb.apps.apps.0.key");
               ')"
-
+              test -n "$key" || fail 'Reverb app key unavailable'
               python3 - "$WS_HOST" "$key" <<'PY'
-            import base64
-            import os
-            import socket
-            import ssl
-            import sys
-
-            host, key = sys.argv[1:]
-
-            token = base64.b64encode(
-                os.urandom(16)
-            ).decode()
-
-            request = (
-                f"GET /app/{key}?protocol=7"
-                f"&client=js&version=8.4.0 HTTP/1.1\r\n"
-                f"Host: {host}\r\n"
-                "Connection: Upgrade\r\n"
-                "Upgrade: websocket\r\n"
-                "Sec-WebSocket-Version: 13\r\n"
-                f"Sec-WebSocket-Key: {token}\r\n"
-                "\r\n"
-            )
-
+            import base64, os, socket, ssl, sys
+            host,key=sys.argv[1:]
+            wskey=base64.b64encode(os.urandom(16)).decode()
+            req=(f'GET /app/{key}?protocol=7&client=js&version=8.4.0 HTTP/1.1\r\n'
+                 f'Host: {host}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n'
+                 f'Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {wskey}\r\n\r\n')
             try:
-                with socket.create_connection(
-                    (host, 443),
-                    timeout=10
-                ) as raw:
-                    with ssl.create_default_context().wrap_socket(
-                        raw,
-                        server_hostname=host
-                    ) as conn:
-                        conn.settimeout(10)
-                        conn.sendall(
-                            request.encode()
-                        )
-                        response = conn.recv(512).split(
-                            b'\r\n',
-                            1
-                        )[0].decode(
-                            errors='replace'
-                        )
-
-            except (OSError, ssl.SSLError) as exc:
-                sys.exit(
-                    'ERROR: public WebSocket '
-                    f'connection failed: {exc}'
-                )
-
-            if not response.startswith(
-                'HTTP/1.1 101 '
-            ):
-                sys.exit(
-                    'ERROR: public WebSocket '
-                    f'handshake: {response}'
-                )
-
-            print(
-                'Public WSS handshake: HTTP 101'
-            )
+                with socket.create_connection((host,443),timeout=10) as raw:
+                    with ssl.create_default_context().wrap_socket(raw,server_hostname=host) as sock:
+                        sock.settimeout(10)
+                        sock.sendall(req.encode())
+                        first=sock.recv(512).split(b'\r\n',1)[0].decode(errors='replace')
+            except Exception as e:
+                sys.exit(f'ERROR: External WebSocket connection failed: {e}')
+            if ' 101 ' not in first:
+                sys.exit(f'ERROR: External WebSocket handshake returned {first}')
+            print('WEBSOCKET_HANDSHAKE=101')
             PY
-
               echo '=== FRONTEND REVERB CONFIG ==='
               echo "REVERB_APP_KEY=$key"
               echo "REVERB_HOST=$WS_HOST"
@@ -652,78 +266,28 @@ jobs:
               echo 'REVERB_SCHEME=https'
               echo 'BROADCAST_AUTH_PATH=/api/student/broadcasting/auth'
               echo 'PRIVATE_CHANNEL=student.ai.conversation.{conversationId}'
-              echo 'WEBSOCKET_HANDSHAKE=101'
-              echo 'Never send REVERB_APP_SECRET to frontend'
+              echo 'Never share REVERB_APP_SECRET'
             }
 
-            start_reverb() {
-              echo "=== STARTING Z-MEDIX REVERB ==="
-
-              if [[ "$(get_status)" == *RUNNING* ]]; then
-                if ! root supervisorctl restart zmedix-reverb; then
-                  diagnose_reverb
-                  fail "Reverb restart failed"
-                fi
-              else
-                if ! root supervisorctl start zmedix-reverb; then
-                  diagnose_reverb
-                  fail "Reverb start failed"
-                fi
-              fi
-
-              echo "$(get_status)"
-
-              if [[ "$(get_status)" != *RUNNING* ]]; then
-                diagnose_reverb
-                fail "Reverb is not RUNNING"
-              fi
-            }
-
+            echo "Action: $ACTION; Server: $(hostname); Project: $APP_PATH"
             case "$ACTION" in
-              inspect)
-                discover_nginx_site
-                echo "Reverb status: $(get_status)"
-                diagnose_reverb
-                ;;
-
-              status)
-                echo "$(get_status)"
-                ;;
-
-              stop)
-                if [[ "$(get_status)" == *RUNNING* ]]; then
-                  root supervisorctl stop zmedix-reverb
-                fi
-
-                echo "$(get_status)"
-                ;;
-
+              status) status ;;
+              inspect) diagnose; root nginx -t ;;
+              stop) if running; then root supervisorctl stop zmedix-reverb; fi; status ;;
               configure-and-start)
-                [[ "$REVERB_PORT" =~ ^[0-9]+$ ]] ||
-                  fail "Invalid Reverb port"
-
-                (( REVERB_PORT >= 1 &&
-                   REVERB_PORT <= 65535 )) ||
-                  fail "Invalid Reverb port"
-
-                [[ "$WS_ORIGINS" =~ ^[a-zA-Z0-9.,:-]+$ ]] ||
-                  fail "Invalid allowed origins"
-
+                preflight
                 configure_nginx
                 configure_env
+                configure_supervisor
                 start_reverb
+                # The Queue worker must reload broadcasting configuration.
+                if root supervisorctl status zmedix-queue 2>&1 | grep -q RUNNING; then
+                  root supervisorctl restart zmedix-queue
+                fi
                 verify_public
                 ;;
-
-              restart)
-                start_reverb
-                verify_public
-                ;;
-
-              *)
-                fail "Unknown action: $ACTION"
-                ;;
+              restart) start_reverb; verify_public ;;
+              *) fail "Invalid action: $ACTION" ;;
             esac
-
-            echo 'Reverb operation complete'
+            echo 'Reverb workflow complete'
             REMOTE
