@@ -38,12 +38,12 @@ class SubscriptionPolicyTest extends TestCase
     public function test_policy_is_editable_using_the_same_translated_rich_text_form(): void
     {
         $section = $this->section();
-        $section->update(['status' => ContentStatus::Published]);
+        $section->update(['status' => ContentStatus::Published, 'data' => ['title' => ['en' => 'Subscription Policy', 'ar' => 'سياسة الاشتراك'], 'body' => ['en' => '', 'ar' => '<p>سياسة الاشتراك</p>']]]);
         $html = '<h2>Subscriptions</h2><p><strong>Manual payment</strong> terms.</p>';
         Livewire::actingAs($this->admin(true), 'admin')->test(EditPageSection::class, ['record' => $section->id])
             ->assertOk()->fillForm([
-                'data.title.en' => 'Subscription Policy', 'data.title.ar' => 'سياسة الاشتراك',
-                'data.body.en' => $html, 'data.body.ar' => '<p>سياسة الاشتراك</p>',
+                'data.title.en' => 'Subscription Policy',
+                'data.body.en' => $html,
             ])->call('save')->assertHasNoFormErrors()->assertNotified();
         $this->assertSame($html, $section->refresh()->data['body']['en']);
         $this->getJson('/api/public/pages/subscription-policy')->assertOk()
@@ -59,6 +59,7 @@ class SubscriptionPolicyTest extends TestCase
         $admin = $this->admin(true);
         $html = '<h2>Saved policy</h2><p><strong>Payment terms</strong></p>';
         $arabic = '<p>شروط الاشتراك</p>';
+        $section->update(['data' => ['title' => ['en' => 'Subscription Policy', 'ar' => 'سياسة الاشتراك'], 'body' => ['en' => '', 'ar' => $arabic]]]);
 
         $this->assertSame(ContentStatus::Draft, $section->status);
         $this->assertFalse($admin->hasPermissionTo('content.publish'));
@@ -70,7 +71,6 @@ class SubscriptionPolicyTest extends TestCase
             ->assertActionDoesNotExist('publish')
             ->fillForm([
                 'data.body.en' => $html,
-                'data.body.ar' => $arabic,
             ])->call('save')->assertHasNoFormErrors()->assertNotified();
 
         $this->assertSame(ContentStatus::Published, $section->refresh()->status);
@@ -109,7 +109,8 @@ class SubscriptionPolicyTest extends TestCase
                 ->call('save')->assertHasNoFormErrors();
 
             $this->assertSame(ContentStatus::Published, $section->refresh()->status);
-            $this->assertSame($data['body'], $section->data['body']);
+            $this->assertSame($data['body']['en'], $section->data['body']['en']);
+            $this->assertSame($data['body']['ar'], $section->data['body']['ar']);
             $this->getJson('/api/public/pages/subscription-policy')->assertOk()
                 ->assertJsonPath('data.content', $data['body']['en']);
             $this->getJson('/api/public/pages/subscription-policy?lang=ar')->assertOk()

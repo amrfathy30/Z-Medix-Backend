@@ -9,12 +9,17 @@ use App\Models\Faq;
 use App\Models\FaqCategory;
 use App\Models\Setting;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Since Phase 3G, CmsSeeder no longer owns any Website Content `pages` rows
  * (about-us, services, privacy-policy, terms-and-conditions) — those are
  * fully owned by PageSectionSeeder + WebsiteContentDefinitions, which create
- * both the Page row and its section(s) from a single source of truth. This
+ * both the Page row and its section(s) from a single source of truth.
+ *
+ * Existing content, including intentionally deleted records, is never reset.
+ * FAQ defaults are created atomically with a new category, so edited ordering
+ * cannot cause a later run to create duplicate questions. The
  * seeder is left with the data Website Content doesn't model: blog
  * categories, FAQ categories/FAQs, and settings.
  */
@@ -36,7 +41,7 @@ class CmsSeeder extends Seeder
         ];
 
         foreach ($categories as $data) {
-            BlogCategory::updateOrCreate(
+            BlogCategory::withTrashed()->firstOrCreate(
                 ['slug' => $data['slug']],
                 array_merge($data, ['status' => ContentStatus::Published])
             );
@@ -60,7 +65,7 @@ class CmsSeeder extends Seeder
                     [
                         'question' => ['en' => 'Is the platform available in multiple languages?', 'ar' => 'هل المنصة متاحة بلغات متعددة؟'],
                         'answer' => [
-                            'en' => 'Yes, the platform is fully available in both Arabic and English.',
+                            'en' => 'The platform currently supports English.',
                             'ar' => 'نعم، المنصة متاحة بالكامل باللغتين العربية والإنجليزية.',
                         ],
                         'sort_order' => 2,
@@ -112,23 +117,23 @@ class CmsSeeder extends Seeder
         ];
 
         foreach ($faqData as $item) {
-            $category = FaqCategory::updateOrCreate(
-                ['slug' => $item['category']['slug']],
-                array_merge($item['category'], ['status' => ContentStatus::Published])
-            );
+            DB::transaction(function () use ($item): void {
+                $category = FaqCategory::withTrashed()->firstOrCreate(
+                    ['slug' => $item['category']['slug']],
+                    array_merge($item['category'], ['status' => ContentStatus::Published])
+                );
 
-            foreach ($item['faqs'] as $faqItem) {
-                Faq::updateOrCreate(
-                    [
-                        'faq_category_id' => $category->id,
-                        'sort_order' => $faqItem['sort_order'],
-                    ],
-                    array_merge($faqItem, [
+                if (! $category->wasRecentlyCreated) {
+                    return;
+                }
+
+                foreach ($item['faqs'] as $faqItem) {
+                    Faq::create(array_merge($faqItem, [
                         'faq_category_id' => $category->id,
                         'status' => ContentStatus::Published,
-                    ])
-                );
-            }
+                    ]));
+                }
+            });
         }
     }
 
@@ -184,7 +189,7 @@ class CmsSeeder extends Seeder
         ];
 
         foreach ($settings as $data) {
-            Setting::updateOrCreate(
+            Setting::firstOrCreate(
                 ['key' => $data['key']],
                 $data
             );

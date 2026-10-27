@@ -190,7 +190,7 @@ class WebsiteContentDefinitions
                         ContentItemDefinition::make([
                             'key' => 'label',
                             'type' => ContentInputType::ShortText,
-                            'label_en' => 'Feature (English)',
+                            'label_en' => 'Feature',
                             'label_ar' => 'الميزة (عربي)',
                             'translatable' => true,
                         ]),
@@ -556,7 +556,7 @@ class WebsiteContentDefinitions
         return ContentItemDefinition::make([
             'key' => 'title',
             'type' => ContentInputType::ShortText,
-            'label_en' => 'Title (English)',
+            'label_en' => 'Title',
             'label_ar' => 'العنوان (عربي)',
             'translatable' => true,
             'sort_order' => $sortOrder,
@@ -568,7 +568,7 @@ class WebsiteContentDefinitions
         return ContentItemDefinition::make([
             'key' => 'subtitle',
             'type' => ContentInputType::ShortText,
-            'label_en' => 'Subtitle (English)',
+            'label_en' => 'Subtitle',
             'label_ar' => 'العنوان الفرعي (عربي)',
             'translatable' => true,
             'sort_order' => $sortOrder,
@@ -580,7 +580,7 @@ class WebsiteContentDefinitions
         return ContentItemDefinition::make([
             'key' => 'body',
             'type' => ContentInputType::LongText,
-            'label_en' => 'Body (English)',
+            'label_en' => 'Body',
             'label_ar' => 'النص (عربي)',
             'translatable' => true,
             'sort_order' => $sortOrder,
@@ -592,7 +592,7 @@ class WebsiteContentDefinitions
         return ContentItemDefinition::make([
             'key' => 'description',
             'type' => ContentInputType::LongText,
-            'label_en' => 'Description (English)',
+            'label_en' => 'Description',
             'label_ar' => 'الوصف (عربي)',
             'translatable' => true,
             'sort_order' => $sortOrder,
@@ -643,13 +643,13 @@ class WebsiteContentDefinitions
             'label_en' => $labelEn,
             'label_ar' => $labelAr,
             'sort_order' => $sortOrder,
+            'settings' => ['item_label' => 'en'],
             'schema' => [
                 ContentItemDefinition::make([
-                    'key' => 'label',
+                    'key' => 'en',
                     'type' => ContentInputType::ShortText,
-                    'label_en' => 'Label (English)',
+                    'label_en' => 'Label',
                     'label_ar' => 'التسمية (عربي)',
-                    'translatable' => true,
                 ]),
             ],
         ]);

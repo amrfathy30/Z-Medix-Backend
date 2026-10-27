@@ -12,20 +12,21 @@ use App\Filament\Resources\PageSectionResource\Pages\ListPageSections;
 use App\Models\Admin;
 use App\Models\Page;
 use App\Models\PageSection;
-use Database\Seeders\PageSectionSeeder;
-use Database\Seeders\RolesPermissionsSeeder;
+use App\Support\Content\Definitions\ContentDefinitionRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
  * PageSectionResource's edit form is generated from WebsiteContentDefinitions
  * via ContentDefinitionRegistry/ContentInputFactory — it no longer depends on
  * SectionFormMapping or page_sections.type. These tests use real, definition-backed
- * page_key/section_key combinations (seeded via PageSectionSeeder) rather than random
+ * page_key/section_key combinations (created from ContentDefinitionRegistry) rather than random
  * factory data, since any page/section without a matching definition now throws
  * MissingContentDefinitionException by design.
  */
@@ -36,8 +37,22 @@ class PageSectionResourceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(RolesPermissionsSeeder::class);
-        $this->seed(PageSectionSeeder::class);
+        $permissions = [];
+        foreach (['view', 'create', 'update', 'delete', 'publish'] as $action) {
+            $permissions[] = Permission::findOrCreate('content.'.$action, 'admin');
+        }
+        foreach (['super_admin', 'content_manager', 'admin'] as $name) {
+            $role = Role::create(['name' => $name, 'guard_name' => 'admin']);
+            $role->givePermissionTo($name === 'admin' ? ['content.view'] : $permissions);
+        }
+        foreach (app(ContentDefinitionRegistry::class)->allPages() as $definition) {
+            $page = Page::firstOrCreate(['key' => $definition->key], ['label' => $definition->labelEn, 'status' => ContentStatus::Published]);
+            foreach ($definition->orderedSections() as $section) {
+                PageSection::firstOrCreate(['page_id' => $page->id, 'section_key' => $section->sectionKey], [
+                    'label' => $section->labelEn, 'data' => $section->defaultData, 'sort_order' => $section->sortOrder, 'status' => ContentStatus::Published,
+                ]);
+            }
+        }
     }
 
     private function adminWithRole(string $roleName): Admin
@@ -250,9 +265,9 @@ class PageSectionResourceTest extends TestCase
             ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
             ->assertOk()
             ->assertFormFieldExists('data.title.en')
-            ->assertFormFieldExists('data.title.ar')
+            ->assertFormFieldDoesNotExist('data.title.ar')
             ->assertFormFieldExists('data.description.en')
-            ->assertFormFieldExists('data.description.ar')
+            ->assertFormFieldDoesNotExist('data.description.ar')
             ->assertFormFieldExists('image')
             ->assertFormFieldExists('image_small')
             // Not defined for home/hero: no old placeholder fields, no repeater, no generic cta composite, no other media collections.
@@ -291,7 +306,7 @@ class PageSectionResourceTest extends TestCase
             ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
             ->assertOk()
             ->assertFormFieldExists('data.cta.text.en')
-            ->assertFormFieldExists('data.cta.text.ar')
+            ->assertFormFieldDoesNotExist('data.cta.text.ar')
             ->assertFormFieldExists('data.cta.url');
     }
 
@@ -400,40 +415,46 @@ class PageSectionResourceTest extends TestCase
     {
         $admin = $this->superAdmin();
         $section = $this->section('services', 'benefits');
+        $content = $section->data;
+        $content['items'] = [];
+        $section->update(['data' => $content]);
 
         Livewire::actingAs($admin, 'admin')
             ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
             ->fillForm([
                 'data.items' => [
-                    ['label' => ['en' => 'Browse our offerings', 'ar' => 'تصفح ما نقدمه']],
-                    ['label' => ['en' => 'Book a session', 'ar' => 'احجز جلسة']],
+                    ['en' => 'Browse our offerings'],
+                    ['en' => 'Book a session'],
                 ],
             ])
             ->call('save')
             ->assertHasNoFormErrors();
 
         $section->refresh();
-        $this->assertSame('Browse our offerings', $section->data['items'][0]['label']['en']);
-        $this->assertSame('احجز جلسة', $section->data['items'][1]['label']['ar']);
+        $this->assertSame('Browse our offerings', $section->data['items'][0]['en']);
+        $this->assertArrayNotHasKey('ar', $section->data['items'][1]);
     }
 
     public function test_content_manager_can_edit_configured_repeater_content(): void
     {
         $admin = $this->adminWithRole('content_manager');
         $section = $this->section('services', 'benefits');
+        $content = $section->data;
+        $content['items'] = [];
+        $section->update(['data' => $content]);
 
         Livewire::actingAs($admin, 'admin')
             ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
             ->fillForm([
                 'data.items' => [
-                    ['label' => ['en' => 'New benefit', 'ar' => 'ميزة جديدة']],
+                    ['en' => 'New benefit'],
                 ],
             ])
             ->call('save')
             ->assertHasNoFormErrors();
 
         $section->refresh();
-        $this->assertSame('New benefit', $section->data['items'][0]['label']['en']);
+        $this->assertSame('New benefit', $section->data['items'][0]['en']);
     }
 
     // ─── CTA item saves correctly ───────────────────────────────────────────────
@@ -443,11 +464,14 @@ class PageSectionResourceTest extends TestCase
         $admin = $this->superAdmin();
         $section = $this->section('services', 'cta');
 
+        $content = $section->data;
+        $content['cta'] = ['text' => ['en' => '', 'ar' => 'ابدأ الآن'], 'url' => null];
+        $section->update(['data' => $content]);
+
         Livewire::actingAs($admin, 'admin')
             ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
             ->fillForm([
                 'data.cta.text.en' => 'Get Started',
-                'data.cta.text.ar' => 'ابدأ الآن',
                 'data.cta.url' => 'https://example.test/start',
             ])
             ->call('save')
@@ -483,9 +507,9 @@ class PageSectionResourceTest extends TestCase
     public function test_landing_sections_render_their_generated_fields(): void
     {
         $expected = [
-            'features' => ['data.title.en', 'data.description.ar', 'data.features'],
+            'features' => ['data.title.en', 'data.description.en', 'data.features'],
             'plans' => ['data.title.en', 'data.description.en', 'data.plans'],
-            'ai_assistant' => ['data.subtitle.en', 'data.title.ar', 'data.description.en', 'image', 'supporting_images', 'logo', 'data.highlights'],
+            'ai_assistant' => ['data.subtitle.en', 'data.title.en', 'data.description.en', 'image', 'supporting_images', 'logo', 'data.highlights'],
             'on_mobile' => ['data.subtitle.en', 'data.title.en', 'data.description.en', 'image'],
         ];
 
@@ -503,15 +527,18 @@ class PageSectionResourceTest extends TestCase
     public function test_plan_rows_persist_into_data_json_with_every_field(): void
     {
         $section = $this->section('home', 'plans');
+        $content = $section->data;
+        $content['plans'] = [];
+        $section->update(['data' => $content]);
 
         Livewire::actingAs($this->superAdmin(), 'admin')
             ->test(EditPageSection::class, ['record' => $section->getRouteKey()])
             ->fillForm(['data.plans' => [[
-                'title' => ['en' => 'Pro Plan', 'ar' => 'باقة برو'],
+                'title' => ['en' => 'Pro Plan'],
                 'price' => 49.99,
                 'discount' => 20,
                 'billing_type' => 'yearly',
-                'features' => [['label' => ['en' => 'Offline mode', 'ar' => 'وضع عدم الاتصال']]],
+                'features' => [['label' => ['en' => 'Offline mode']]],
                 'background_color' => '#112233',
                 'icon_color' => '#FFFFFF',
             ]]])
@@ -523,7 +550,7 @@ class PageSectionResourceTest extends TestCase
         $this->assertEquals(49.99, $plan['price']);
         $this->assertEquals(20, $plan['discount']);
         $this->assertSame('yearly', $plan['billing_type']);
-        $this->assertSame('وضع عدم الاتصال', $plan['features'][0]['label']['ar']);
+        $this->assertArrayNotHasKey('ar', $plan['features'][0]['label']);
         $this->assertSame('#112233', $plan['background_color']);
         $this->assertSame('#FFFFFF', $plan['icon_color']);
     }

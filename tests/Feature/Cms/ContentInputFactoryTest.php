@@ -43,12 +43,12 @@ class ContentInputFactoryTest extends TestCase
         $this->assertSame('data.title', $component->getName());
     }
 
-    public function test_translatable_short_text_renders_one_input_per_locale(): void
+    public function test_translatable_short_text_renders_only_english_with_a_plain_label(): void
     {
         $item = ContentItemDefinition::make([
             'key' => 'title',
             'type' => ContentInputType::ShortText,
-            'label_en' => 'Title',
+            'label_en' => 'Title (English) (English)',
             'label_ar' => 'العنوان',
             'translatable' => true,
         ]);
@@ -63,7 +63,10 @@ class ContentInputFactoryTest extends TestCase
         );
 
         $this->assertContains('data.title.en', $names);
-        $this->assertContains('data.title.ar', $names);
+        $this->assertNotContains('data.title.ar', $names);
+        $fields = $component->getDefaultChildComponents();
+        $this->assertSame('Title', $fields[0]->getLabel());
+        $this->assertCount(1, $fields);
     }
 
     public function test_long_text_renders_textarea(): void
@@ -143,7 +146,7 @@ class ContentInputFactoryTest extends TestCase
         );
 
         $this->assertContains('data.cta.text.en', $names);
-        $this->assertContains('data.cta.text.ar', $names);
+        $this->assertNotContains('data.cta.text.ar', $names);
         $this->assertContains('data.cta.url', $names);
     }
 

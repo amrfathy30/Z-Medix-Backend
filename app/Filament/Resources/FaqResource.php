@@ -19,9 +19,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -88,9 +87,9 @@ class FaqResource extends Resource
                     ])
                     ->columns(4),
 
-                Tabs::make('Locales')
-                    ->tabs([
-                        Tab::make(__('admin.cms.tab_english'))
+                Section::make()
+                    ->schema([
+                        Group::make()
                             ->schema([
                                 TextInput::make('question.en')
                                     ->label(__('admin.cms.field_question_en'))
@@ -98,15 +97,6 @@ class FaqResource extends Resource
                                     ->maxLength(500),
                                 Textarea::make('answer.en')
                                     ->label(__('admin.cms.field_answer_en'))
-                                    ->rows(4),
-                            ]),
-                        Tab::make(__('admin.cms.tab_arabic'))
-                            ->schema([
-                                TextInput::make('question.ar')
-                                    ->label(__('admin.cms.field_question_ar'))
-                                    ->maxLength(500),
-                                Textarea::make('answer.ar')
-                                    ->label(__('admin.cms.field_answer_ar'))
                                     ->rows(4),
                             ]),
                     ])

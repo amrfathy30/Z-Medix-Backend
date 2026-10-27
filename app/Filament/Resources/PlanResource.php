@@ -17,9 +17,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -93,9 +92,9 @@ class PlanResource extends Resource
                             ->label(__('admin.plans.field_is_active'))
                             ->helperText(__('admin.plans.is_active_hint'))
                             ->default(true),
-                        Tabs::make('Locales')
-                            ->tabs([
-                                Tab::make(__('admin.cms.tab_english'))
+                        Section::make()
+                            ->schema([
+                                Group::make()
                                     ->schema([
                                         TextInput::make('name.en')
                                             ->label(__('admin.plans.field_name_en'))
@@ -109,16 +108,6 @@ class PlanResource extends Resource
                                             }),
                                         Textarea::make('description.en')
                                             ->label(__('admin.plans.field_description_en'))
-                                            ->rows(3)
-                                            ->maxLength(500),
-                                    ]),
-                                Tab::make(__('admin.cms.tab_arabic'))
-                                    ->schema([
-                                        TextInput::make('name.ar')
-                                            ->label(__('admin.plans.field_name_ar'))
-                                            ->maxLength(120),
-                                        Textarea::make('description.ar')
-                                            ->label(__('admin.plans.field_description_ar'))
                                             ->rows(3)
                                             ->maxLength(500),
                                     ]),

@@ -114,10 +114,6 @@ return [
         'cannot_change_root_admin_type' => 'لا يمكن تغيير نوع الحساب الرئيسي.',
     ],
 
-    'locale_switcher' => [
-        'switch_to' => 'English',
-    ],
-
     'profile' => [
         'title' => 'ملفي الشخصي',
         'navigation_label' => 'الملف الشخصي',
@@ -130,7 +126,6 @@ return [
         'field_last_name' => 'الاسم الأخير',
         'field_email' => 'البريد الإلكتروني',
         'field_job_title' => 'المسمى الوظيفي',
-        'field_locale' => 'اللغة',
         'field_current_password' => 'كلمة المرور الحالية',
         'field_new_password' => 'كلمة المرور الجديدة',
         'field_new_password_confirmation' => 'تأكيد كلمة المرور الجديدة',

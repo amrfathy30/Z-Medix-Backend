@@ -21,9 +21,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
@@ -68,9 +67,9 @@ class BlogResource extends Resource
     {
         return $schema
             ->components([
-                Tabs::make('Locales')
-                    ->tabs([
-                        Tab::make(__('admin.cms.tab_english'))
+                Section::make()
+                    ->schema([
+                        Group::make()
                             ->schema([
                                 TextInput::make('title.en')
                                     ->label(__('admin.cms.field_title_en'))
@@ -87,24 +86,6 @@ class BlogResource extends Resource
                                     ->maxLength(255),
                                 TextInput::make('meta_description.en')
                                     ->label(__('admin.cms.field_meta_description_en'))
-                                    ->maxLength(500),
-                            ]),
-                        Tab::make(__('admin.cms.tab_arabic'))
-                            ->schema([
-                                TextInput::make('title.ar')
-                                    ->label(__('admin.cms.field_title_ar'))
-                                    ->maxLength(255),
-                                TextInput::make('excerpt.ar')
-                                    ->label(__('admin.cms.field_excerpt_ar'))
-                                    ->maxLength(500),
-                                RichEditor::make('content.ar')
-                                    ->label(__('admin.cms.field_content_ar'))
-                                    ->columnSpanFull(),
-                                TextInput::make('meta_title.ar')
-                                    ->label(__('admin.cms.field_meta_title_ar'))
-                                    ->maxLength(255),
-                                TextInput::make('meta_description.ar')
-                                    ->label(__('admin.cms.field_meta_description_ar'))
                                     ->maxLength(500),
                             ]),
                     ])

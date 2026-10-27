@@ -197,14 +197,14 @@ class AdminInputs
     }
 
     /**
-     * Composite CTA input: bilingual button text plus a single URL field.
+     * Composite CTA input: button text plus a single URL field.
      *
      * @param  list<string>  $locales
      */
-    public static function cta(string $name, array $locales = ['en', 'ar']): Group
+    public static function cta(string $name, array $locales = ['en']): Group
     {
         $textFields = array_map(
-            fn (string $locale): TextInput => TextInput::make("{$name}.text.{$locale}")->maxLength(255),
+            fn (string $locale): TextInput => TextInput::make("{$name}.text.{$locale}")->label(__('admin.cms.field_cta_text'))->maxLength(255),
             $locales,
         );
 

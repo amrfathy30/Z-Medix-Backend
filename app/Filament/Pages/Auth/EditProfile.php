@@ -11,7 +11,6 @@ use App\Services\Phone\PhoneNumberService;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -25,8 +24,6 @@ use SensitiveParameter;
 
 class EditProfile extends BaseEditProfile
 {
-    private const SUPPORTED_LOCALES = ['ar' => 'العربية', 'en' => 'English'];
-
     public static function getLabel(): string
     {
         return __('admin.profile.title');
@@ -43,7 +40,6 @@ class EditProfile extends BaseEditProfile
                         $this->getEmailFormComponent(),
                         $this->getEmailCurrentPasswordFormComponent(),
                         $this->getJobTitleFormComponent(),
-                        $this->getLocaleFormComponent(),
                     ]),
                 Section::make(__('admin.profile.section_change_password'))
                     ->schema([
@@ -108,14 +104,6 @@ class EditProfile extends BaseEditProfile
             ->label(__('admin.profile.field_job_title'))
             ->maxLength(255)
             ->nullable();
-    }
-
-    protected function getLocaleFormComponent(): Component
-    {
-        return Select::make('locale')
-            ->label(__('admin.profile.field_locale'))
-            ->options(self::SUPPORTED_LOCALES)
-            ->required();
     }
 
     protected function getCurrentPasswordFormComponent(): Component

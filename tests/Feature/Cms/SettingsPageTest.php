@@ -6,11 +6,12 @@ use App\Enums\SettingValueType;
 use App\Filament\Pages\SettingsPage;
 use App\Models\Admin;
 use App\Models\Setting;
-use Database\Seeders\RolesPermissionsSeeder;
 use Filament\Forms\Components\Textarea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class SettingsPageTest extends TestCase
@@ -20,7 +21,10 @@ class SettingsPageTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(RolesPermissionsSeeder::class);
+        $role = Role::create(['name' => 'super_admin', 'guard_name' => 'admin']);
+        foreach (['settings.view', 'settings.update'] as $permission) {
+            $role->givePermissionTo(Permission::findOrCreate($permission, 'admin'));
+        }
     }
 
     private function superAdmin(): Admin
@@ -86,15 +90,14 @@ class SettingsPageTest extends TestCase
         ]);
     }
 
-    public function test_translatable_setting_renders_one_input_per_locale_prefilled(): void
+    public function test_translatable_setting_renders_only_english_prefilled(): void
     {
         $setting = $this->translatableSetting();
 
         Livewire::actingAs($this->superAdmin(), 'admin')->test(SettingsPage::class)
             ->assertFormFieldExists("setting_{$setting->id}.en", 'form')
-            ->assertFormFieldExists("setting_{$setting->id}.ar", 'form')
-            ->assertSet("data.setting_{$setting->id}.en", 'Hello')
-            ->assertSet("data.setting_{$setting->id}.ar", 'مرحبا');
+            ->assertFormFieldDoesNotExist("setting_{$setting->id}.ar", 'form')
+            ->assertSet("data.setting_{$setting->id}.en", 'Hello');
     }
 
     public function test_description_settings_use_a_textarea_per_locale(): void

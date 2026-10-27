@@ -64,7 +64,7 @@ class WebsiteContentPage extends BasePage
 
         return $translated !== $key
             ? $translated
-            : (app()->getLocale() === 'ar' ? $definition->labelAr : $definition->labelEn);
+            : $definition->labelEn;
     }
 
     private function sectionCard(PageContentDefinition $definition): array

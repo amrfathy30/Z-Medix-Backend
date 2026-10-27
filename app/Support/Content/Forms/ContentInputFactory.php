@@ -7,6 +7,7 @@ use App\Support\Content\Enums\ContentInputType;
 use App\Support\Content\Validation\ContentInputValidationMapper;
 use App\Support\Filament\Inputs\AdminInputs;
 use Filament\Forms\Components\Field;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
@@ -21,9 +22,6 @@ use Filament\Schemas\Components\Group;
  */
 class ContentInputFactory
 {
-    /** @var list<string> */
-    private const DEFAULT_LOCALES = ['en', 'ar'];
-
     /** @var list<ContentInputType> */
     private const MEDIA_TYPES = [
         ContentInputType::Image,
@@ -180,21 +178,14 @@ class ContentInputFactory
 
     private function makeTranslatable(ContentItemDefinition $item, string $path): Component
     {
-        $locales = $item->settings['locales'] ?? self::DEFAULT_LOCALES;
-
-        $fields = array_map(
-            fn (string $locale): Field => $this->applyMeta($item, $this->leaf($item, "{$path}.{$locale}"), $locale),
-            $locales,
-        );
-
-        return Group::make($fields)->columns(min(count($fields), 2));
+        return Group::make([
+            $this->applyMeta($item, $this->leaf($item, "{$path}.en")),
+        ])->columns(1);
     }
 
     private function makeCta(ContentItemDefinition $item, string $path): Component
     {
-        $locales = $item->settings['locales'] ?? self::DEFAULT_LOCALES;
-
-        return AdminInputs::cta($path, $locales)
+        return AdminInputs::cta($path, ['en'])
             ->extraAttributes(['data-content-key' => $item->key]);
     }
 
@@ -205,7 +196,10 @@ class ContentInputFactory
             $item->schema,
         );
 
-        $repeater = AdminInputs::repeater($path, $schema)->label($item->labelEn);
+        $schema[] = Hidden::make(EnglishContentData::ROW_INDEX);
+
+        $repeater = AdminInputs::repeater($path, $schema)
+            ->label($this->englishLabel($item->labelEn));
 
         if (isset($item->settings['min_items'])) {
             $repeater->minItems((int) $item->settings['min_items']);
@@ -235,10 +229,10 @@ class ContentInputFactory
         return is_string($value) && $value !== '' ? $value : null;
     }
 
-    private function applyMeta(ContentItemDefinition $item, Field $field, ?string $locale = null): Field
+    private function applyMeta(ContentItemDefinition $item, Field $field): Field
     {
-        $label = $locale === 'ar' ? $item->labelAr : $item->labelEn;
-        $help = $locale === 'ar' ? $item->helpAr : $item->helpEn;
+        $label = $this->englishLabel($item->labelEn);
+        $help = $item->helpEn;
 
         $field = $field->label($label);
 
@@ -251,6 +245,11 @@ class ContentInputFactory
         }
 
         return $field;
+    }
+
+    private function englishLabel(string $label): string
+    {
+        return preg_replace('/(?:\s*\((?:English|EN)\))+$/i', '', $label);
     }
 
     private function path(string $basePath, string $key): string

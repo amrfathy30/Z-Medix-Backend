@@ -7,6 +7,7 @@ use App\Filament\Pages\Auth\EditProfile;
 use App\Http\Controllers\Admin\SubscriptionPeriodProofController;
 use App\Http\Middleware\SetAdminLocale;
 use App\Models\Setting;
+use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -16,7 +17,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Tables\View\TablesRenderHook;
-use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -24,10 +24,11 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Livewire\Livewire;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -36,6 +37,14 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('admin')
+            ->bootUsing(function (): void {
+                // Livewire restores a snapshot's locale after persistent middleware runs.
+                Livewire::listen('hydrate', function (): void {
+                    if (Filament::getCurrentPanel()?->getId() === 'admin') {
+                        App::setLocale('en');
+                    }
+                });
+            })
             ->domain(config('app.admin_domain'))
             ->path('')
             ->viteTheme('resources/css/filament/admin/theme.css')
@@ -66,10 +75,6 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
             ])
             ->renderHook(
-                PanelsRenderHook::USER_MENU_BEFORE,
-                fn (): string => Blade::render("@livewire('admin-locale-switcher')"),
-            )
-            ->renderHook(
                 TablesRenderHook::TOOLBAR_SEARCH_AFTER,
                 fn (): View => view(
                     'filament.components.table-per-page-select',
@@ -87,8 +92,8 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                SetAdminLocale::class,
             ])
+            ->middleware([SetAdminLocale::class], isPersistent: true)
             ->authMiddleware([
                 Authenticate::class,
             ]);

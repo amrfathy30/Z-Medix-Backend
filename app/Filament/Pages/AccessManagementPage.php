@@ -170,13 +170,7 @@ class AccessManagementPage extends Page implements HasTable
 
     public function getRoleDisplayName(Role $role): string
     {
-        $locale = app()->getLocale();
-
-        if ($locale === 'ar' && filled($role->display_name_ar)) {
-            return $role->display_name_ar;
-        }
-
-        if ($locale === 'en' && filled($role->display_name_en)) {
+        if (filled($role->display_name_en)) {
             return $role->display_name_en;
         }
 
@@ -185,18 +179,13 @@ class AccessManagementPage extends Page implements HasTable
 
     public function getLocalizedRoleName(string $roleName): string
     {
-        $locale = app()->getLocale();
         $role = Role::where('guard_name', 'admin')->where('name', $roleName)->first();
 
         if (! $role) {
             return $roleName;
         }
 
-        if ($locale === 'ar' && filled($role->display_name_ar)) {
-            return $role->display_name_ar;
-        }
-
-        if ($locale === 'en' && filled($role->display_name_en)) {
+        if (filled($role->display_name_en)) {
             return $role->display_name_en;
         }
 
@@ -205,13 +194,7 @@ class AccessManagementPage extends Page implements HasTable
 
     public function getPermissionLabel(Permission $permission): string
     {
-        $locale = app()->getLocale();
-
-        if ($locale === 'ar' && filled($permission->display_name_ar)) {
-            return $permission->display_name_ar;
-        }
-
-        if ($locale === 'en' && filled($permission->display_name_en)) {
+        if (filled($permission->display_name_en)) {
             return $permission->display_name_en;
         }
 
@@ -295,9 +278,6 @@ class AccessManagementPage extends Page implements HasTable
             ->schema([
                 Grid::make(2)
                     ->schema([
-                        TextInput::make('display_name_ar')
-                            ->label(__('admin.access_management.arabic_role_name'))
-                            ->required(),
                         TextInput::make('display_name_en')
                             ->label(__('admin.access_management.english_role_name'))
                             ->required(),
@@ -313,7 +293,6 @@ class AccessManagementPage extends Page implements HasTable
                 $role = Role::create([
                     'name' => $name,
                     'guard_name' => 'admin',
-                    'display_name_ar' => $data['display_name_ar'],
                     'display_name_en' => $data['display_name_en'],
                 ]);
 
@@ -348,7 +327,6 @@ class AccessManagementPage extends Page implements HasTable
                 $this->editingRoleId = $arguments['roleId'];
                 $role = Role::with('permissions')->find($arguments['roleId']);
                 $form->fill([
-                    'display_name_ar' => $role->display_name_ar,
                     'display_name_en' => $role->display_name_en,
                     'permissions' => $role->permissions->pluck('name')->toArray(),
                 ]);
@@ -356,9 +334,6 @@ class AccessManagementPage extends Page implements HasTable
             ->schema([
                 Grid::make(2)
                     ->schema([
-                        TextInput::make('display_name_ar')
-                            ->label(__('admin.access_management.arabic_role_name'))
-                            ->required(),
                         TextInput::make('display_name_en')
                             ->label(__('admin.access_management.english_role_name'))
                             ->required(),
@@ -371,7 +346,6 @@ class AccessManagementPage extends Page implements HasTable
             ->action(function (array $data, array $arguments): void {
                 $role = Role::find($arguments['roleId']);
 
-                $role->display_name_ar = $data['display_name_ar'];
                 $role->display_name_en = $data['display_name_en'];
                 $role->save();
 

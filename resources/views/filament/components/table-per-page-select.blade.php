@@ -1,11 +1,6 @@
-@php
-    $isRtl = __('filament-panels::layout.direction') === 'rtl';
-@endphp
-
 @if (count($pageOptions) > 1)
     <label
         class="fi-pagination-records-per-page-select fi-compact"
-        @if ($isRtl) dir="rtl" @endif
     >
         <x-filament::input.wrapper>
             <x-filament::input.select wire:model.live="tableRecordsPerPage">

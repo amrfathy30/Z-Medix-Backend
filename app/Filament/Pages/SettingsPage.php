@@ -45,7 +45,7 @@ class SettingsPage extends Page
      */
     private const HIDDEN_GROUPS = ['home'];
 
-    /** Locales edited side by side for a translatable (Json `{en, ar}`) setting. */
+    /** Locale keys recognized in stored translated settings. */
     private const TRANSLATABLE_LOCALES = ['en', 'ar'];
 
     public static function getNavigationLabel(): string
@@ -168,9 +168,10 @@ class SettingsPage extends Page
             $previous = $setting->value;
 
             if ($this->isTranslatable($setting)) {
-                $translations = $this->normalizeTranslations($value);
+                $translations = json_decode((string) $setting->value, true);
+                $translations['en'] = (string) ($value['en'] ?? '');
 
-                if ($translations === $this->translationsOf($setting)) {
+                if ($translations === json_decode((string) $setting->value, true)) {
                     continue;
                 }
 
@@ -242,8 +243,7 @@ class SettingsPage extends Page
 
     /**
      * A Json setting whose value is an `{en, ar}` map — SettingResource already
-     * resolves these per request locale, so the dashboard edits one input per
-     * locale instead of raw JSON.
+     * resolves these per request locale; the dashboard edits English only.
      */
     private function isTranslatable(Setting $setting): bool
     {
@@ -258,20 +258,12 @@ class SettingsPage extends Page
             && array_diff(array_keys($decoded), self::TRANSLATABLE_LOCALES) === [];
     }
 
-    /** @return array<string, string> Stored translations in fixed locale order, missing locales as ''. */
+    /** @return array{en: string} */
     private function translationsOf(Setting $setting): array
     {
-        return $this->normalizeTranslations(json_decode((string) $setting->value, true));
-    }
+        $translations = json_decode((string) $setting->value, true);
 
-    /** @return array<string, string> */
-    private function normalizeTranslations(mixed $value): array
-    {
-        $value = is_array($value) ? $value : [];
-
-        return collect(self::TRANSLATABLE_LOCALES)
-            ->mapWithKeys(fn (string $locale): array => [$locale => (string) ($value[$locale] ?? '')])
-            ->all();
+        return ['en' => (string) ($translations['en'] ?? '')];
     }
 
     private function makeField(Setting $setting): Component
@@ -328,12 +320,12 @@ class SettingsPage extends Page
             fn (string $locale): Component => (str_contains($setting->key, 'description')
                 ? Textarea::make("{$statePath}.{$locale}")->rows(3)
                 : TextInput::make("{$statePath}.{$locale}"))
-                ->label("{$label} — ".__("admin.cms.locale_{$locale}"))
+                ->label($label)
                 ->helperText($helperText),
-            self::TRANSLATABLE_LOCALES,
+            ['en'],
         );
 
-        return Group::make($fields)->columns(2)->columnSpanFull();
+        return Group::make($fields)->columns(1)->columnSpanFull();
     }
 
     private function makeStringField(string $statePath, string $label, ?string $helperText, string $key): TextInput

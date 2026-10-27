@@ -26,7 +26,7 @@ class ReportCaseController extends Controller
             'search' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $perPage = min((int) $request->integer('per_page', 15), 50);
+        $perPage = min(max((int) $request->integer('per_page', 15), 1), 50);
 
         $reportCases = ReportCase::query()
             ->active()

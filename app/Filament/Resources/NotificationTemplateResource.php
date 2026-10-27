@@ -18,9 +18,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -108,27 +107,16 @@ class NotificationTemplateResource extends Resource
                     ])
                     ->columns(4),
 
-                Tabs::make('Locales')
-                    ->tabs([
-                        Tab::make(__('notifications.templates.english'))
+                Section::make()
+                    ->schema([
+                        Group::make()
                             ->schema([
                                 TextInput::make('title.en')
-                                    ->label(__('notifications.templates.title') . ' (EN)')
+                                    ->label(__('notifications.templates.title'))
                                     ->required()
                                     ->maxLength(255),
                                 Textarea::make('body.en')
-                                    ->label(__('notifications.templates.body') . ' (EN)')
-                                    ->required()
-                                    ->rows(4),
-                            ]),
-                        Tab::make(__('notifications.templates.arabic'))
-                            ->schema([
-                                TextInput::make('title.ar')
-                                    ->label(__('notifications.templates.title') . ' (AR)')
-                                    ->required()
-                                    ->maxLength(255),
-                                Textarea::make('body.ar')
-                                    ->label(__('notifications.templates.body') . ' (AR)')
+                                    ->label(__('notifications.templates.body'))
                                     ->required()
                                     ->rows(4),
                             ]),

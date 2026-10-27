@@ -17,9 +17,8 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -63,9 +62,9 @@ class FaqCategoryResource extends Resource
     {
         return $schema
             ->components([
-                Tabs::make('Locales')
-                    ->tabs([
-                        Tab::make(__('admin.cms.tab_english'))
+                Section::make()
+                    ->schema([
+                        Group::make()
                             ->schema([
                                 TextInput::make('name.en')
                                     ->label(__('admin.cms.field_name_en'))
@@ -73,15 +72,6 @@ class FaqCategoryResource extends Resource
                                     ->maxLength(255),
                                 TextInput::make('description.en')
                                     ->label(__('admin.cms.field_description_en'))
-                                    ->maxLength(500),
-                            ]),
-                        Tab::make(__('admin.cms.tab_arabic'))
-                            ->schema([
-                                TextInput::make('name.ar')
-                                    ->label(__('admin.cms.field_name_ar'))
-                                    ->maxLength(255),
-                                TextInput::make('description.ar')
-                                    ->label(__('admin.cms.field_description_ar'))
                                     ->maxLength(500),
                             ]),
                     ])

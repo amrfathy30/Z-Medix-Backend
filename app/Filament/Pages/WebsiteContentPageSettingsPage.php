@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Http\Controllers\SitemapController;
 use App\Models\Page;
 use App\Support\Content\Definitions\ContentDefinitionRegistry;
-use App\Support\Localization\PublicLocales;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -122,7 +121,7 @@ class WebsiteContentPageSettingsPage extends BasePage
     /** @param array<string, mixed> $values */
     private function applyTranslations(Page $page, string $attribute, array $values): void
     {
-        foreach (PublicLocales::all() as $locale) {
+        foreach (['en'] as $locale) {
             $value = trim((string) ($values[$locale] ?? ''));
 
             if ($value === '') {
@@ -142,7 +141,7 @@ class WebsiteContentPageSettingsPage extends BasePage
     {
         $state = [];
 
-        foreach (PublicLocales::all() as $locale) {
+        foreach (['en'] as $locale) {
             $state[$locale] = (string) ($page?->getTranslation($attribute, $locale, false) ?? '');
         }
 
@@ -155,21 +154,21 @@ class WebsiteContentPageSettingsPage extends BasePage
         $editable = $this->canUpdate();
         $components = [];
 
-        foreach (PublicLocales::all() as $locale) {
+        foreach (['en'] as $locale) {
             $components[] = TextInput::make("meta_title.{$locale}")
-                ->label(__('admin.cms.page_seo_field_meta_title').' ('.__("admin.cms.locale_{$locale}").')')
+                ->label(__('admin.cms.page_seo_field_meta_title'))
                 ->maxLength(255)->disabled(! $editable)->dehydrated($editable)->columnSpanFull();
         }
 
-        foreach (PublicLocales::all() as $locale) {
+        foreach (['en'] as $locale) {
             $components[] = Textarea::make("meta_description.{$locale}")
-                ->label(__('admin.cms.page_seo_field_meta_description').' ('.__("admin.cms.locale_{$locale}").')')
+                ->label(__('admin.cms.page_seo_field_meta_description'))
                 ->rows(3)->maxLength(500)->disabled(! $editable)->dehydrated($editable)->columnSpanFull();
         }
 
-        foreach (PublicLocales::all() as $locale) {
+        foreach (['en'] as $locale) {
             $components[] = TextInput::make("public_path.{$locale}")
-                ->label(__('admin.cms.page_seo_field_public_path').' ('.__("admin.cms.locale_{$locale}").')')
+                ->label(__('admin.cms.page_seo_field_public_path'))
                 ->helperText(__('admin.cms.page_seo_field_public_path_helper'))->maxLength(255)
                 ->disabled(! $editable)->dehydrated($editable)
                 ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? trim($state) : null)

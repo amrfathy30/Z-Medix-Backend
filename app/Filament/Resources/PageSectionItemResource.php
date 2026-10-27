@@ -20,9 +20,8 @@ use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
@@ -101,14 +100,10 @@ class PageSectionItemResource extends Resource
                     ->maxSize(config('media.max_image_size_kb', 5 * 1024))
                     ->columnSpan(2),
             ])->columns(4),
-            Tabs::make('Locales')->tabs([
-                Tab::make(__('admin.cms.tab_english'))->schema([
+            Section::make()->schema([
+                Group::make()->schema([
                     TextInput::make('title.en')->label(__('admin.cms.field_title_en'))->maxLength(255),
                     Textarea::make('description.en')->label(__('admin.cms.field_description_en'))->rows(4)->maxLength(2000),
-                ]),
-                Tab::make(__('admin.cms.tab_arabic'))->schema([
-                    TextInput::make('title.ar')->label(__('admin.cms.field_title_ar'))->maxLength(255),
-                    Textarea::make('description.ar')->label(__('admin.cms.field_description_ar'))->rows(4)->maxLength(2000),
                 ]),
             ])->columnSpanFull(),
         ]);

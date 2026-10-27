@@ -140,14 +140,12 @@ class PageSectionResource extends Resource
         $pageDefinition = $registry->forPage($page->key);
         $sectionDefinition = $registry->forSection($page->key, $record->section_key);
 
-        $locale = app()->getLocale();
-
         $components = [
             Placeholder::make('editing_context')
                 ->label('')
                 ->content(__('admin.cms.page_section_editing_label', [
-                    'page' => $locale === 'ar' ? $pageDefinition->labelAr : $pageDefinition->labelEn,
-                    'section' => $locale === 'ar' ? $sectionDefinition->labelAr : $sectionDefinition->labelEn,
+                    'page' => $pageDefinition->labelEn,
+                    'section' => $sectionDefinition->labelEn,
                 ]))
                 ->columnSpanFull(),
         ];

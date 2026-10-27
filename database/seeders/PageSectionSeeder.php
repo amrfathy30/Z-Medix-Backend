@@ -30,7 +30,7 @@ class PageSectionSeeder extends Seeder
     /** @var list<string> */
     private const DESIGNED_PAGE_KEYS = [
         'home', 'about-us', 'services',
-        'privacy-policy', 'terms-and-conditions', 'contact-us',
+        'privacy-policy', 'terms-and-conditions', 'subscription-policy', 'contact-us',
     ];
 
     public function run(): void
@@ -47,6 +47,10 @@ class PageSectionSeeder extends Seeder
         $definition = $registry->forPage($pageKey);
         $page = $this->resolvePage($pageKey, $definition);
 
+        if ($page->trashed()) {
+            return;
+        }
+
         foreach ($definition->orderedSections() as $section) {
             $this->seedSection($page, $section);
         }
@@ -55,7 +59,7 @@ class PageSectionSeeder extends Seeder
     /** Looked up by `key`; creates the Page row itself if it doesn't exist yet. */
     private function resolvePage(string $pageKey, PageContentDefinition $definition): Page
     {
-        $page = Page::query()->where('key', $pageKey)->first();
+        $page = Page::withTrashed()->where('key', $pageKey)->first();
 
         if ($page === null) {
             $page = Page::create([
@@ -66,7 +70,9 @@ class PageSectionSeeder extends Seeder
             ]);
         }
 
-        $this->fillEmptyPageMetadata($page, $definition);
+        if (! $page->trashed()) {
+            $this->fillEmptyPageMetadata($page, $definition);
+        }
 
         return $page;
     }
@@ -99,15 +105,19 @@ class PageSectionSeeder extends Seeder
 
     private function seedSection(Page $page, ContentSectionDefinition $section): void
     {
-        $pageSection = PageSection::firstOrCreate(
+        $pageSection = PageSection::withTrashed()->firstOrCreate(
             ['page_id' => $page->id, 'section_key' => $section->sectionKey],
             [
                 'label' => $section->labelEn,
                 'data' => $section->defaultData,
                 'sort_order' => $section->sortOrder,
-                'status' => ContentStatus::Published,
+                'status' => $page->key === 'subscription-policy' ? ContentStatus::Draft : ContentStatus::Published,
             ]
         );
+
+        if ($pageSection->trashed()) {
+            return;
+        }
 
         // Structural metadata only — never touch data/status on a section
         // that already existed before this run.
